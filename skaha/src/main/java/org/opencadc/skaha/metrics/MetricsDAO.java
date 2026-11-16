@@ -1,12 +1,15 @@
 package org.opencadc.skaha.metrics;
 
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import org.apache.log4j.Logger;
 
 /**
- * Central data access for all Skaha metrics: platform stats from the Metrics backend and session pod usage (Kubernetes
- * metrics API or Metrics backend session API, selected via {@link PodUsageProvider#SKAHA_POD_METRICS_SOURCE}).
+ * Central data access for all Skaha metrics: platform stats and session reports from the Metrics backend, and session
+ * pod usage (Kubernetes metrics API or Metrics backend session API, selected via
+ * {@link PodUsageProvider#SKAHA_POD_METRICS_SOURCE}).
  *
  * <p>The Skaha Helm chart always co-deploys Metrics and injects {@link PlatformMetricsDAO#SKAHA_METRICS_BACKEND_URL}.
  * When that variable is unset outside the chart, session listing and pod usage still work;
@@ -19,18 +22,34 @@ public class MetricsDAO {
 
     private final PlatformMetricsDAO platformMetricsDAO;
     private final PodUsageProvider podUsageProvider;
+    private final SessionMetricsDAO sessionMetricsDAO;
 
     /**
-     * Production wiring: Metrics backend for platform stats when configured; environment-selected pod-usage provider
-     * always.
+     * Production wiring: Metrics backend for platform stats and session reports when configured; environment-selected
+     * pod-usage provider always.
      */
     public MetricsDAO() {
-        this(PlatformMetricsDAO.fromEnvironmentOrNull(), PodUsageProvider.fromEnvironment());
+        this(SessionMetricsDAO.fromEnvironmentOrNull());
+    }
+
+    private MetricsDAO(final SessionMetricsDAO sessionMetricsDAO) {
+        this(
+                PlatformMetricsDAO.fromEnvironmentOrNull(),
+                PodUsageProvider.fromEnvironment(sessionMetricsDAO),
+                sessionMetricsDAO);
     }
 
     MetricsDAO(final PlatformMetricsDAO platformMetricsDAO, final PodUsageProvider podUsageProvider) {
+        this(platformMetricsDAO, podUsageProvider, null);
+    }
+
+    MetricsDAO(
+            final PlatformMetricsDAO platformMetricsDAO,
+            final PodUsageProvider podUsageProvider,
+            final SessionMetricsDAO sessionMetricsDAO) {
         this.platformMetricsDAO = platformMetricsDAO;
         this.podUsageProvider = podUsageProvider;
+        this.sessionMetricsDAO = sessionMetricsDAO;
     }
 
     /** @visibleForTesting */
@@ -65,17 +84,32 @@ public class MetricsDAO {
     }
 
     /**
+     * Fetch the sessions' reports from the Metrics backend with bounded fan-out, whatever the pod-usage source.
+     *
+     * <p>Soft-fails: a session whose report cannot be read is absent, and every session is absent when the backend is
+     * not configured.
+     *
+     * @return Reports keyed by session id.
+     */
+    public Map<String, SessionMetrics> getSessionMetrics(final Collection<String> sessionIds) {
+        if (sessionMetricsDAO == null) {
+            return Map.of();
+        }
+        return sessionMetricsDAO.getSessionMetrics(sessionIds);
+    }
+
+    /**
      * Fetch per-pod CPU and memory usage for session workloads, formatted for session listings.
      *
      * <p>Soft-fails: returns {@link PodResourceUsage#empty()} when pod metrics cannot be retrieved. Does not require
      * the Metrics HTTP backend when the Kubernetes pod-usage source is selected.
      *
      * @param userID constrain by user ID when non-null/non-blank; otherwise all users
-     * @param omitHeadless when true, exclude headless session pods
+     * @param interactiveOnly when true, exclude headless and batch session pods
      * @return session-list pod usage DTO
      */
-    public PodResourceUsage getPodResourceUsage(final String userID, final boolean omitHeadless) {
-        return getPodResourceUsage(userID, omitHeadless, List.of());
+    public PodResourceUsage getPodResourceUsage(final String userID, final boolean interactiveOnly) {
+        return getPodResourceUsage(userID, interactiveOnly, List.of());
     }
 
     /**
@@ -84,9 +118,9 @@ public class MetricsDAO {
      * @param userJobs listed session Jobs; required for the Metrics backend pod-usage source
      */
     public PodResourceUsage getPodResourceUsage(
-            final String userID, final boolean omitHeadless, final List<Job> userJobs) {
+            final String userID, final boolean interactiveOnly, final List<Job> userJobs) {
         try {
-            return PodMetrics.toPodResourceUsage(podUsageProvider.getPodMetrics(userID, omitHeadless, userJobs));
+            return PodMetrics.toPodResourceUsage(podUsageProvider.getPodMetrics(userID, interactiveOnly, userJobs));
         } catch (Exception e) {
             log.warn("Failed to fetch pod metrics for sessions: " + e.getMessage(), e);
             return PodResourceUsage.empty();

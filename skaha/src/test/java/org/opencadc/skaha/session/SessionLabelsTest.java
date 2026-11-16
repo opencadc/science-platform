@@ -44,12 +44,13 @@ public class SessionLabelsTest {
                 "canfar.net/id=session-123,canfar.net/username=alice",
                 SessionLabels.forSession("alice", "session-123"));
         Assert.assertEquals(
-                "canfar.net/id=session-123,canfar.net/username=alice,canfar.net/kind!=headless",
+                "canfar.net/id=session-123,canfar.net/username=alice,canfar.net/kind!=headless,canfar.net/kind!=batch",
                 SessionLabels.forUserSessions("alice", "session-123", true));
         Assert.assertEquals(
                 "canfar.net/id=session-123,canfar.net/username=alice,canfar.net/app-id=app-123,canfar.net/kind=desktop-app",
                 SessionLabels.forDesktopApp("session-123", "alice", "app-123"));
-        Assert.assertEquals("canfar.net/kind!=headless", SessionLabels.forUserSessions("", "", true));
+        Assert.assertEquals(
+                "canfar.net/kind!=headless,canfar.net/kind!=batch", SessionLabels.forUserSessions("", "", true));
         Assert.assertEquals("", SessionLabels.forUserSessions("", "", false));
     }
 

@@ -78,7 +78,6 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.log4j.Level;
 import org.jetbrains.annotations.NotNull;
@@ -144,28 +143,25 @@ public class UserStorageClientTest {
         };
 
         // Should pass
-        testSubject.checkExistingSessions(SessionType.HEADLESS, Collections.emptyList());
-
-        // Should pass
         final List<Session> sessions = new ArrayList<>();
-        testSubject.checkExistingSessions(SessionType.NOTEBOOK, sessions);
+        testSubject.checkExistingSessions(sessions);
 
         // Should pass
         sessions.add(TestUtils.createSession("id1", SessionType.NOTEBOOK, Session.STATUS_FAILED));
-        testSubject.checkExistingSessions(SessionType.NOTEBOOK, sessions);
+        testSubject.checkExistingSessions(sessions);
 
         sessions.clear();
 
         // Should pass
         sessions.add(TestUtils.createSession("id1", SessionType.NOTEBOOK, Session.STATUS_TERMINATING));
-        testSubject.checkExistingSessions(SessionType.DESKTOP, sessions);
+        testSubject.checkExistingSessions(sessions);
 
         sessions.clear();
 
         // Should fail (max 1 session by default)
         sessions.add(TestUtils.createSession("id1", SessionType.NOTEBOOK, Session.STATUS_PENDING));
         try {
-            testSubject.checkExistingSessions(SessionType.NOTEBOOK, sessions);
+            testSubject.checkExistingSessions(sessions);
             Assert.fail("Should throw IllegalArgumentException");
         } catch (IllegalArgumentException exception) {
             // Good.

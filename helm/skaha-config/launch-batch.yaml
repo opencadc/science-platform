@@ -1,0 +1,82 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "${skaha.jobname}"
+# Skaha sets completions, parallelism and maxFailedIndexes from the request.
+spec:
+  completionMode: Indexed
+  backoffLimitPerIndex: 0
+  activeDeadlineSeconds: 1209600
+  ttlSecondsAfterFinished: 86400
+  podFailurePolicy:
+    rules:
+    - action: Ignore
+      onPodConditions:
+      - type: DisruptionTarget
+  template:
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      {{ template "skaha.job.nodeAffinity" . }}
+      hostname: "${software.hostname}"
+      initContainers:
+      {{ template "skaha.job.initContainers" . }}
+      securityContext:
+        {{ template "skaha.job.securityContext" . }}
+      containers:
+      - name: "${skaha.jobname}"
+        # image and start of the 'env' label comes from the image bundle
+        ${headless.image.bundle}
+        - name: skaha_hostname
+          value: "${skaha.hostname}"
+        - name: skaha_username
+          value: "${skaha.userid}"
+        - name: skaha_sessionid
+          value: "${skaha.sessionid}"
+        - name: HOME
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: PWD
+          value: "${SKAHA_USER_HOME_DIR}"
+        - name: OMP_NUM_THREADS
+          value: "${software.thread.count}"
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        workingDir: "${SKAHA_USER_HOME_DIR}"
+        imagePullPolicy: {{ .Values.deployment.skaha.sessions.imagePullPolicy | required "deployment.skaha.sessions.imagePullPolicy must be set." }}
+        resources:
+          requests:
+            memory: "${software.requests.ram}"
+            cpu: "${software.requests.cores}"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.minEphemeralStorage }}"
+          limits:
+            memory: "${software.limits.ram}"
+            cpu: "${software.limits.cores}"
+            ephemeral-storage: "{{ .Values.deployment.skaha.sessions.maxEphemeralStorage }}"
+        volumeMounts:
+        - mountPath: "/etc/passwd"
+          name: etc-passwd
+          subPath: passwd
+        - mountPath: "/etc/group"
+          name: etc-group
+          subPath: group
+        {{ template "skaha.session.commonVolumeMounts" . }}
+      {{- with .Values.deployment.skaha.sessions.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - name: etc-group
+        emptyDir: { }
+      - name: etc-passwd
+        emptyDir: { }
+      - name: init-users-groups
+        configMap:
+          name: {{ .Release.Name }}-init-users-groups-config
+          defaultMode: 0777
+      {{ template "skaha.session.commonVolumes" . }}

@@ -78,6 +78,21 @@ public class SessionJobCacheTest {
         Assert.assertEquals(List.of("skaha-notebook-alice-a1"), names(this.cache.userJobs("alice", false)));
     }
 
+    @Test
+    public void interactiveListingLeavesOutHeadlessAndBatch() throws Exception {
+        create(job("skaha-notebook-alice-n1", "alice", "n1", "notebook"));
+        create(job("skaha-headless-alice-h1", "alice", "h1", "headless"));
+        create(job("batch-b1", "alice", "b1", "batch"));
+        this.cache.start();
+        // Waiting for the watch too: closing the mock API mid-handshake times out its shutdown.
+        KubernetesApi.await("the cache to list and watch", this.cache::isCurrent);
+
+        Assert.assertEquals(List.of("skaha-notebook-alice-n1"), names(this.cache.userJobs("alice", true)));
+        Assert.assertEquals(
+                List.of("batch-b1", "skaha-headless-alice-h1", "skaha-notebook-alice-n1"),
+                names(this.cache.userJobs("alice", false)));
+    }
+
     private Job create(final Job job) {
         return this.api
                 .client()

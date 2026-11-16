@@ -70,9 +70,17 @@ package org.opencadc.skaha.session;
 import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.rest.SyncInput;
 import ca.nrc.cadc.util.StringUtil;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.SkahaAction;
+import org.opencadc.skaha.metrics.SessionMetrics;
 
 public abstract class SessionAction extends SkahaAction {
 
@@ -85,14 +93,81 @@ public abstract class SessionAction extends SkahaAction {
     protected static final String SESSION_VIEW_INTERACTIVE = "interactive";
     protected static final String NONE = "<none>";
 
+    /** Writes the Metrics-style documents of the batch API (the Batch document and its failure Status). */
+    static final ObjectMapper DOCUMENTS = new ObjectMapper()
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .enable(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN)
+            .addMixIn(SessionMetrics.Resource.class, MetricsRow.class);
+
     private static final Logger log = Logger.getLogger(SessionAction.class);
 
     protected String requestType;
     protected String sessionID;
     protected String appID;
 
+    /** Whether the session a GET names runs as a batch. GetAction decides it once, from the session's Job. */
+    protected boolean batchSession;
+
     public SessionAction() {
         super();
+    }
+
+    /**
+     * A failed batch request: the Metrics failure document, {@code application/json}.
+     *
+     * @param reason {@code BadRequest}, {@code NotFound} or {@code ServiceUnavailable}.
+     */
+    record FailureStatus(String apiVersion, String kind, String status, String reason, String message, int code) {
+        private static final Map<Integer, String> REASONS =
+                Map.of(400, "BadRequest", 404, "NotFound", 503, "ServiceUnavailable");
+
+        FailureStatus(final String reason, final String message, final int code) {
+            this("v1", "Status", "Failure", reason, message, code);
+        }
+    }
+
+    /** A Batch document copies each Metrics row as Metrics wrote it: a value the report left out stays out. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private interface MetricsRow {}
+
+    /**
+     * Write a batch request's 400, 404 or 503 as a {@link FailureStatus}; every other error keeps the
+     * {@code text/plain} body cadc-rest writes. A batch request sends {@code type=batch} or {@code maxfail}, or names a
+     * batch session.
+     */
+    @Override
+    protected void handleException(
+            final Throwable ex, final int code, final String message, final boolean showError, final boolean showCause)
+            throws IOException {
+        final String reason = FailureStatus.REASONS.get(code);
+        if (reason == null || !(this.batchSession || sendsBatchParameters())) {
+            super.handleException(ex, code, message, showError, showCause);
+            return;
+        }
+        this.logInfo.setMessage(message);
+        if (showError) {
+            log.error(message, ex);
+        } else {
+            log.debug(message, ex);
+        }
+        if (!this.syncOutput.isOpen()) {
+            final byte[] body = DOCUMENTS
+                    .writeValueAsString(new FailureStatus(reason, message, code))
+                    .getBytes(StandardCharsets.UTF_8);
+            this.syncOutput.setCode(code);
+            this.syncOutput.setHeader("Content-Type", "application/json");
+            this.syncOutput.setHeader("Content-Length", Integer.toString(body.length));
+            this.syncOutput.getOutputStream().write(body);
+        }
+    }
+
+    private boolean sendsBatchParameters() {
+        if (this.syncInput == null) {
+            return false;
+        }
+        final String type = this.syncInput.getParameter("type");
+        return (type != null && SessionType.BATCH.applicationName.equalsIgnoreCase(type.trim()))
+                || this.syncInput.getParameter("maxfail") != null;
     }
 
     protected void initRequest() throws Exception {

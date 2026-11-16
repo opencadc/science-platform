@@ -2,6 +2,7 @@ package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.util.FileUtil;
 import io.fabric8.kubernetes.api.model.Container;
+import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.NodeSelectorRequirement;
 import io.fabric8.kubernetes.api.model.NodeSelectorRequirementBuilder;
 import io.fabric8.kubernetes.api.model.PodSpec;
@@ -9,6 +10,7 @@ import io.fabric8.kubernetes.api.model.Quantity;
 import io.fabric8.kubernetes.api.model.TopologySpreadConstraint;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.client.utils.Serialization;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -179,6 +182,55 @@ public class SessionJobBuilderTest {
 
         final Job disabled = build("test-base-values-queue.yaml", parameters("notebook"), builder -> builder);
         Assert.assertTrue(podSpec(disabled).getTopologySpreadConstraints().isEmpty());
+    }
+
+    /** A batch asks Kueue for every replica at once, at the batch priority. */
+    @Test
+    public void testBatchJob() throws Exception {
+        final Job job = SessionJobBuilder.fromPath(
+                        SessionFixtures.template("launch-batch.yaml"),
+                        new LaunchAssignment("skaha-workload", "alice", "default", "cq", "low"))
+                .withParameters(SessionFixtures.parameters("batch"))
+                .withImage(SessionFixtures.image("batch"))
+                .withHeadlessCommand(SessionJobBuilder.HeadlessCommand.fromRequest("python", null, List.of()))
+                .withBatch(new BatchSpec(50, new BigDecimal("0.25")))
+                .buildLaunch()
+                .job();
+
+        Assert.assertEquals("low", job.getMetadata().getLabels().get("kueue.x-k8s.io/priority-class"));
+        Assert.assertEquals("alice-default-lq", job.getMetadata().getLabels().get("kueue.x-k8s.io/queue-name"));
+        Assert.assertFalse(
+                job.getSpec().getTemplate().getMetadata().getLabels().containsKey("kueue.x-k8s.io/priority-class"));
+        Assert.assertEquals(Integer.valueOf(50), job.getSpec().getCompletions());
+        Assert.assertEquals(Integer.valueOf(50), job.getSpec().getParallelism());
+        Assert.assertEquals(Integer.valueOf(12), job.getSpec().getMaxFailedIndexes());
+        Assert.assertEquals(
+                Map.of("kueue.x-k8s.io/job-min-parallelism", "1", "canfar.net/maxfail", "0.25"),
+                job.getMetadata().getAnnotations());
+        Assert.assertNull("no headless PriorityClass", podSpec(job).getPriorityClassName());
+    }
+
+    /** Every app container of every session kind gets the session's CANFAR_* variables, once each. */
+    @Test
+    public void testSessionVariablesOnEveryKind() throws Exception {
+        for (final SessionType type : SessionType.values()) {
+            final Job job =
+                    SessionFixtures.builder(type.applicationName).buildLaunch().job();
+            for (final Container container : podSpec(job).getContainers()) {
+                final Map<String, List<String>> values = container.getEnv().stream()
+                        .filter(env -> env.getName().startsWith("CANFAR_SESSION_")
+                                || env.getName().equals("CANFAR_USERNAME"))
+                        .collect(Collectors.groupingBy(
+                                EnvVar::getName, Collectors.mapping(EnvVar::getValue, Collectors.toList())));
+                Assert.assertEquals(
+                        type + " " + container.getName(),
+                        Map.of(
+                                "CANFAR_SESSION_KIND", List.of(type.applicationName),
+                                "CANFAR_SESSION_ID", List.of(SessionFixtures.SESSION_ID),
+                                "CANFAR_USERNAME", List.of(SessionFixtures.USER)),
+                        values);
+            }
+        }
     }
 
     @Test

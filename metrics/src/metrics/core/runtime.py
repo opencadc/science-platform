@@ -40,7 +40,7 @@ _SURFACES: tuple[MetricsSurface, ...] = ("platform", "user", "community", "sessi
 _KEY_PREFIX = "metrics:"
 _VALIDATION_TIMEOUT_SECONDS = 60.0
 """Bound on one startup probe or readiness validation."""
-_SCHEMA_REVISION = "9"
+_SCHEMA_REVISION = "10"
 _SOURCE_REVISION = "kueue-v2"
 _QUERY_REVISION = "0"
 

@@ -50,7 +50,7 @@ A successful report is one `canfar.net/v1alpha1` `Metrics` object:
 | `spec.<surface>` | string | yes | Exactly one of `platform`, `user`, `community`, or `session`, echoing the path subject |
 | `status.observedAt` | RFC 3339 UTC | yes | Conservative observation time: the oldest source timestamp in the report (see [Report time](#report-time)) |
 | `status.reservingWorkloads` | integer ≥ 0 | yes | Kueue `reservingWorkloads` (Platform, User, Community) or active Job count (Session) |
-| `status.resources[]` | array | yes | One entry per resource name, sorted by name; may be empty for a User, Community, or Session that reserves nothing |
+| `status.resources[]` | array | yes | One entry per resource name, sorted by name; may be empty for a User, Community, or Session that reserves nothing. A batch Session always lists its resources |
 | `status.conditions[]` | array | yes | Exactly one `Ready` and one `Cached` condition |
 
 Resource entries by surface:
@@ -60,7 +60,8 @@ Resource entries by surface:
 | `name` | yes | yes | yes | Kubernetes resource name (`cpu`, `memory`, `nvidia.com/gpu`, …) |
 | `capacity` | yes | — | — | Summed ClusterQueue nominal quota |
 | `allocated` | yes | — | — | Summed ClusterQueue `flavorsUsage` total |
-| `requests` | — | yes | yes | Kueue reservation (User, Community) or effective pod requests of active Jobs (Session) |
+| `total` | — | — | batch only | One pod's effective request times the batch Job's `completions`: the demand of the whole run |
+| `requests` | — | yes | yes | Kueue reservation (User, Community) or what the session's active Jobs hold now (Session) |
 | `usage` | — | — | optional | Live `metrics.k8s.io` usage of Running session pods; `cpu` and `memory` only |
 | `efficiency` | optional | optional | optional | PromQL efficiency ratio; `cpu` and `memory` only |
 
@@ -254,6 +255,28 @@ one ran for a few seconds, under the one-minute efficiency minimum:
 }
 ```
 
+A batch of 50 replicas whose pod requests 1 CPU and 4Gi. Kueue admitted 10
+pods, 12 indexes succeeded, and 1 failed, so the batch holds 10 pods:
+
+```json
+"reservingWorkloads": 1,
+"resources": [
+  {"name": "cpu", "total": "50", "requests": "10", "usage": "6.3", "efficiency": "0.68"},
+  {"name": "memory", "total": "200Gi", "requests": "40Gi", "usage": "21.6Gi", "efficiency": "0.55"}
+]
+```
+
+The same batch holds nothing while it waits for admission and after it
+finishes. Its rows stay, with `requests` at zero:
+
+```json
+"reservingWorkloads": 0,
+"resources": [
+  {"name": "cpu", "total": "50", "requests": "0"},
+  {"name": "memory", "total": "200Gi", "requests": "0Gi"}
+]
+```
+
 A report whose optional efficiency read failed:
 
 ```json
@@ -367,11 +390,23 @@ session's Pods at the same time. No matching Job is a 404.
 - A Job **reserves** quota while it has neither a true `Complete` nor a true
   `Failed` condition and is not suspended (a suspended Job is waiting for Kueue
   admission). `reservingWorkloads` is the number of such Jobs.
-- `requests` sums each reserving Job's **effective pod request**, computed as
-  Kubernetes and Kueue do: per resource, the larger of the init-container peak
-  (each regular init container plus the native sidecars started before it) and
-  the app containers plus all native sidecars, plus any pod overhead.
-  A finished session returns 200 with no resources.
+- The **effective pod request** is one pod's request, computed as Kubernetes
+  and Kueue do: per resource, the larger of the init-container peak (each
+  regular init container plus the native sidecars started before it) and the
+  app containers plus all native sidecars, plus any pod overhead.
+- A reserving Job **holds** its effective pod request times the pods it can
+  still run at once: `min(parallelism, completions - succeeded)`, and
+  failed indexes stay held because Kueue reclaims only succeeded ones. It is
+  never below zero. A Job without `parallelism` or `completions` holds one pod.
+  `requests` sums what every reserving Job holds. A headless or interactive Job
+  has `parallelism` and `completions` of 1, so it holds one pod until it
+  finishes. Near the end of a batch, the held count falls with the remaining
+  indexes. At `parallelism` 10 with 3 indexes left, the batch holds 3 pods.
+- A Job labelled `canfar.net/kind=batch` also reports `total`: its effective
+  pod request times `completions`. The total does not change during the run. A
+  batch Job lists its resources at every stage. While it is suspended or
+  finished, its `requests` are zero.
+- Any other session that reserves nothing returns 200 with no resources.
 - `usage` sums `metrics.k8s.io` CPU and memory of the session's Running pods,
   read only in namespaces that have one. It is omitted when no pod is Running.
 - A Pod-list failure keeps the Job data and marks the report `PartialData`.
@@ -380,7 +415,7 @@ The session window used by efficiency starts at the earliest Job `startTime`.
 It ends now while any Job is unfinished; otherwise at the latest terminal time
 (`completionTime`, or the transition time of the terminal condition).
 
-GPU requests are reported; GPU usage and efficiency are not.
+GPU `total` and `requests` are reported; GPU usage and efficiency are not.
 
 ## Efficiency
 

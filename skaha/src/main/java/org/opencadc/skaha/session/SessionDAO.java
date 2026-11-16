@@ -14,7 +14,9 @@ import java.net.URISyntaxException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
@@ -22,6 +24,7 @@ import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.SkahaKubernetesClient;
 import org.opencadc.skaha.metrics.MetricsDAO;
 import org.opencadc.skaha.metrics.PodResourceUsage;
+import org.opencadc.skaha.metrics.SessionMetrics;
 
 public class SessionDAO {
     public static final Logger LOGGER = Logger.getLogger(SessionDAO.class);
@@ -42,17 +45,27 @@ public class SessionDAO {
     }
 
     public static Session getSession(String forUserID, String sessionID) throws Exception {
-        final List<Session> sessions = SessionDAO.getUserSessions(forUserID, sessionID, false);
-        if (!sessions.isEmpty()) {
-            for (Session session : sessions) {
-                // exclude 'desktop-app'
-                if (!SkahaAction.TYPE_DESKTOP_APP.equalsIgnoreCase(session.getType())) {
-                    return session;
-                }
-            }
-        }
+        return toSession(
+                forUserID,
+                sessionJob(forUserID, sessionID)
+                        .orElseThrow(() -> new ResourceNotFoundException("session " + sessionID + " not found")));
+    }
 
-        throw new ResourceNotFoundException("session " + sessionID + " not found");
+    /** The session a Job runs, with its resource usage. */
+    static Session toSession(final String forUserID, final Job job) {
+        return toSessions(forUserID, false, List.of(job)).getFirst();
+    }
+
+    /**
+     * The session's own Job, not a desktop app's, read live.
+     *
+     * @param forUserID The owner, or null for any user.
+     * @return The Job, or empty when the session has none.
+     */
+    static Optional<Job> sessionJob(final String forUserID, final String sessionID) {
+        return liveJobs(forUserID, sessionID, false).stream()
+                .filter(job -> !SkahaAction.TYPE_DESKTOP_APP.equals(SessionLabels.get(job, SessionLabels.Key.KIND)))
+                .findFirst();
     }
 
     static void deleteDesktopApplicationJob(final String sessionID, final String username, final String appID) {
@@ -74,23 +87,31 @@ public class SessionDAO {
     /**
      * Sessions matching the filters. A user's full listing (no session ID) comes from the per-replica cache while it is
      * current; a lookup by session ID, or any read while the cache is not current, is a live read.
+     *
+     * @param interactiveOnly Leave out headless and batch sessions, on either read.
      */
-    static List<Session> getUserSessions(final String forUserID, final String sessionID, final boolean omitHeadless) {
+    static List<Session> getUserSessions(
+            final String forUserID, final String sessionID, final boolean interactiveOnly) {
         final SessionJobCache current = SessionDAO.cache;
         final List<Job> userJobs = servedFromCache(current, forUserID, sessionID)
-                ? current.userJobs(forUserID, omitHeadless)
-                : liveJobs(forUserID, sessionID, omitHeadless);
-        return toSessions(forUserID, omitHeadless, userJobs);
+                ? current.userJobs(forUserID, interactiveOnly)
+                : liveJobs(forUserID, sessionID, interactiveOnly);
+        return toSessions(forUserID, interactiveOnly, userJobs);
     }
 
     static boolean servedFromCache(final SessionJobCache cache, final String forUserID, final String sessionID) {
         return StringUtil.hasText(forUserID) && !StringUtil.hasText(sessionID) && cache != null && cache.isCurrent();
     }
 
-    static List<Job> liveJobs(final String forUserID, final String sessionID, final boolean omitHeadless) {
-        return jobs().withLabelSelector(SessionLabels.forUserSessions(forUserID, sessionID, omitHeadless))
+    static List<Job> liveJobs(final String forUserID, final String sessionID, final boolean interactiveOnly) {
+        // The cache's predicate too, so a live and a cached listing leave out the same kinds.
+        return jobs()
+                .withLabelSelector(SessionLabels.forUserSessions(forUserID, sessionID, interactiveOnly))
                 .list()
-                .getItems();
+                .getItems()
+                .stream()
+                .filter(job -> !interactiveOnly || SessionLabels.interactive(job))
+                .toList();
     }
 
     /** The session's desktop Job, parent of its desktop apps. */
@@ -106,11 +127,15 @@ public class SessionDAO {
     /**
      * Give each active Job of the session the configured expiry from now; a Job with that much time left is left alone.
      *
-     * @throws IllegalArgumentException When the session has no active Job.
+     * @throws IllegalArgumentException When the session has no active Job, or is a batch: a batch cannot be renewed.
      */
     static void renew(
             final String username, final String sessionID, final Duration configuredExpiry, final Instant now) {
-        final List<Job> activeJobs = liveJobs(username, sessionID, false).stream()
+        final List<Job> sessionJobs = liveJobs(username, sessionID, false);
+        if (sessionJobs.stream().anyMatch(Batch::is)) {
+            throw new IllegalArgumentException("A batch cannot be renewed.");
+        }
+        final List<Job> activeJobs = sessionJobs.stream()
                 .filter(job -> job.getStatus() != null
                         && Objects.equals(job.getStatus().getActive(), 1)
                         && job.getStatus().getStartTime() != null)
@@ -143,12 +168,24 @@ public class SessionDAO {
         return configuredExpiry.toSeconds() > remainingSeconds ? elapsedSeconds + configuredExpiry.toSeconds() : 0L;
     }
 
+    /**
+     * Sessions for these Jobs, with their resource usage. A batch reads its Metrics session report whatever the pod
+     * usage source; the other sessions read pod usage.
+     */
     private static List<Session> toSessions(
-            final String forUserID, final boolean omitHeadless, final List<Job> userJobs) {
+            final String forUserID, final boolean interactiveOnly, final List<Job> userJobs) {
+        final MetricsDAO metricsDAO = MetricsDAO.getDefault();
+        final Map<Boolean, List<Job>> byBatch = userJobs.stream().collect(Collectors.partitioningBy(Batch::is));
         final PodResourceUsage podResourceUsage =
-                MetricsDAO.getDefault().getPodResourceUsage(forUserID, omitHeadless, userJobs);
+                metricsDAO.getPodResourceUsage(forUserID, interactiveOnly, byBatch.get(false));
+        final Map<String, SessionMetrics> batchMetrics = metricsDAO.getSessionMetrics(byBatch.get(true).stream()
+                .map(job -> SessionLabels.get(job, SessionLabels.Key.ID))
+                .collect(Collectors.toSet()));
         return userJobs.stream()
-                .map(job -> SessionBuilder.fromJob(job, podResourceUsage))
+                .map(job -> Batch.is(job)
+                        ? SessionBuilder.fromBatchJob(
+                                job, batchMetrics.get(SessionLabels.get(job, SessionLabels.Key.ID)))
+                        : SessionBuilder.fromJob(job, podResourceUsage))
                 .collect(Collectors.toList());
     }
 

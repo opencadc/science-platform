@@ -71,12 +71,15 @@ public class SessionErrorsTest {
         // The limit counts the user's live interactive sessions, including one launched a moment ago.
         this.requests.maxUserSessions = 1;
         this.api.clusterQueue("cq", "default");
+        // A batch neither counts toward the limit nor is held to it.
+        this.requests.post(launch("batch").param("cmd", "true"));
         this.requests.post(launch("notebook"));
         final IllegalArgumentException limit =
                 Assert.assertThrows(IllegalArgumentException.class, () -> this.requests.post(launch("carta")));
         Assert.assertTrue(limit.getMessage(), limit.getMessage().contains("maximum of 1 active sessions"));
         // Headless sessions do not count.
         this.requests.post(launch("headless").param("cmd", "true"));
+        this.requests.post(launch("batch").param("cmd", "true"));
     }
 
     @Test

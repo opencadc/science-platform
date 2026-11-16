@@ -10,11 +10,24 @@ from typing import Any
 
 import httpx
 import pytest
+from fakeredis import FakeAsyncRedis
 from fastapi.testclient import TestClient
 
 import metrics.core.factory as factory_module
-from metrics.cache import CacheIdentity, CacheNotFound, FRESHNESS_POLICIES
-from metrics.errors import AppError, ProviderUnavailableError, SubjectNotFoundError
+from metrics.cache import (
+    CacheIdentity,
+    CacheNotFound,
+    FRESHNESS_POLICIES,
+    RedisSnapshots,
+    StoredSnapshot,
+    cache_keys,
+)
+from metrics.errors import (
+    AppError,
+    ProviderExecutionError,
+    ProviderUnavailableError,
+    SubjectNotFoundError,
+)
 from metrics.providers.kubemetrics import KubeMetricsProvider
 from metrics.providers.session import SessionProvider
 from metrics.services.metrics import MetricsService
@@ -27,6 +40,7 @@ from metrics.services.models import (
     SessionUsageObservation,
 )
 from tests.test_app_smoke import (
+    FakeEfficiency,
     FakeProvider,
     FakeSessionProvider,
     _cache,
@@ -527,6 +541,178 @@ def test_session_not_found_is_sanitized() -> None:
 
     assert response.status_code == 404
     assert response.json()["reason"] == "NotFound"
+
+
+def _batch(
+    *,
+    parallelism: int = 50,
+    succeeded: int = 0,
+    failed: int = 0,
+    suspend: bool = False,
+    completion_time: str | None = None,
+    memory: str = "4Gi",
+    gpu: str | None = None,
+) -> dict[str, Any]:
+    """Build one 50-replica batch Job whose pod requests 1 CPU and 4Gi."""
+    job = _job(
+        "batch-k7nq2wpx",
+        "work-a",
+        "k7nq2wpx",
+        cpu="1",
+        memory=memory,
+        gpu=gpu,
+        start_time=None if suspend else "2026-01-01T12:00:00Z",
+        completion_time=completion_time,
+    )
+    job["metadata"]["labels"]["canfar.net/kind"] = "batch"
+    job["spec"].update(
+        completionMode="Indexed", completions=50, parallelism=parallelism, suspend=suspend
+    )
+    job["status"].update(succeeded=succeeded, failed=failed)
+    return job
+
+
+def _session_status(api: FakeKubernetesApi, session_id: str, **wiring: Any) -> dict[str, Any]:
+    """Serve one session report read from the fake cluster's Jobs and Pods."""
+    runtime, _provider = _runtime(session_provider=SessionProvider(_settings(), api=api), **wiring)
+    with TestClient(factory_module.create_app(settings=_settings(), runtime=runtime)) as client:
+        response = client.get(f"/apis/canfar.net/v1alpha1/metrics/session/{session_id}")
+    assert response.status_code == 200
+    return response.json()["status"]
+
+
+@pytest.mark.parametrize(
+    ("job", "reserving", "cpu", "memory"),
+    [
+        pytest.param(_batch(suspend=True), 0, "0", "0Gi", id="suspended"),
+        pytest.param(_batch(parallelism=10, succeeded=12, failed=1), 1, "10", "40Gi", id="at-10"),
+        pytest.param(_batch(parallelism=10, succeeded=47), 1, "3", "12Gi", id="3-left"),
+        pytest.param(
+            _batch(parallelism=10, succeeded=46, failed=1), 1, "4", "16Gi", id="failed-still-held"
+        ),
+        pytest.param(
+            _batch(parallelism=10, succeeded=50, completion_time="2026-01-01T13:00:00Z"),
+            0,
+            "0",
+            "0Gi",
+            id="finished",
+        ),
+    ],
+)
+def test_batch_report_keeps_the_run_total_and_holds_only_runnable_pods(
+    job: dict[str, Any], reserving: int, cpu: str, memory: str
+) -> None:
+    """A batch lists its whole-run total at every stage beside what it holds now."""
+    status = _session_status(FakeKubernetesApi(jobs={"work-a": [job]}), "k7nq2wpx")
+
+    assert status["reservingWorkloads"] == reserving
+    assert status["resources"] == [
+        {"name": "cpu", "total": "50", "requests": cpu},
+        {"name": "memory", "total": "200Gi", "requests": memory},
+    ]
+
+
+def test_running_batch_rows_add_live_usage_and_a_quota_only_gpu_row() -> None:
+    """CPU and memory gain usage and efficiency; the GPU row carries only total and requests."""
+    api = FakeKubernetesApi(
+        jobs={"work-a": [_batch(parallelism=10, succeeded=12, failed=1, gpu="1")]},
+        pods={"work-a": [_pod("batch-k7nq2wpx-13-x9k2p", "work-a", "k7nq2wpx")]},
+        pod_metrics={"work-a": [_pod_metrics("batch-k7nq2wpx-13-x9k2p", cpu="630m", memory="2Gi")]},
+    )
+    status = _session_status(
+        api, "k7nq2wpx", usage_provider=KubeMetricsProvider(api=api), efficiency=FakeEfficiency()
+    )
+
+    assert status["resources"] == [
+        {"name": "cpu", "total": "50", "requests": "10", "usage": "0.63", "efficiency": "0.5"},
+        {
+            "name": "memory",
+            "total": "200Gi",
+            "requests": "40Gi",
+            "usage": "2Gi",
+            "efficiency": "0.75",
+        },
+        {"name": "nvidia.com/gpu", "total": "50", "requests": "10"},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("completion_time", "resources"),
+    [
+        pytest.param(
+            None,
+            [{"name": "cpu", "requests": "1"}, {"name": "memory", "requests": "4Gi"}],
+            id="running",
+        ),
+        pytest.param("2026-01-01T12:30:00Z", [], id="finished"),
+    ],
+)
+def test_headless_report_holds_one_pod_and_has_no_total(
+    completion_time: str | None, resources: list[dict[str, str]]
+) -> None:
+    """A one-pod headless Job reports its pod while it runs and nothing after."""
+    job = _job(
+        "headless-h1", "work-a", "h1", cpu="1", memory="4Gi", completion_time=completion_time
+    )
+    job["metadata"]["labels"]["canfar.net/kind"] = "headless"
+    job["spec"].update(completions=1, parallelism=1)
+
+    status = _session_status(FakeKubernetesApi(jobs={"work-a": [job]}), "h1")
+
+    assert status["resources"] == resources
+
+
+async def test_batch_total_is_exact_for_long_gib_fractions() -> None:
+    """Fifty pods of 1000000001 bytes total exactly 50000000050 bytes in GiB."""
+    api = FakeKubernetesApi(jobs={"work-a": [_batch(memory="1000000001")]})
+    observation = await SessionProvider(_settings(), api=api).read_session("k7nq2wpx")
+
+    assert observation.totals["memory"] == "46.56612877734005451202392578125Gi"
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "value"),
+    [("spec", "completions", "50"), ("spec", "parallelism", True), ("status", "succeeded", -1)],
+)
+async def test_invalid_job_counts_fail_the_session_read(
+    section: str, field: str, value: object
+) -> None:
+    """A malformed Job size or counter fails the read instead of guessing a pod count."""
+    job = _batch()
+    job[section][field] = value
+    provider = SessionProvider(_settings(), api=FakeKubernetesApi(jobs={"work-a": [job]}))
+
+    with pytest.raises(ProviderExecutionError):
+        await provider.read_session("k7nq2wpx")
+
+
+async def test_cached_batch_snapshot_keeps_its_totals() -> None:
+    """A batch snapshot read back from Redis still carries its whole-run totals."""
+    api = FakeKubernetesApi(jobs={"work-a": [_batch(suspend=True)]})
+    observation = await SessionProvider(_settings(), api=api).read_session("k7nq2wpx")
+    snapshot = CachedSnapshot(observation=observation, created=observation.observed_at)
+    store = RedisSnapshots[CachedSnapshot](
+        redis=FakeAsyncRedis(),
+        value_type=CachedSnapshot,
+        secret=b"k" * 32,
+        schema_revision="test",
+        source_revision="test",
+        query_revision="test",
+    )
+    keys = cache_keys(
+        prefix="metrics:",
+        identity=CacheIdentity("session", "k7nq2wpx", "cluster-a", "session", "test"),
+        secret=b"k" * 32,
+        schema_revision="test",
+        source_revision="test",
+        query_revision="test",
+    )
+
+    decoded = store.decode(keys, store.encode(keys, StoredSnapshot(snapshot)))
+
+    assert decoded == StoredSnapshot(snapshot)
+    assert isinstance(decoded.value.observation, SessionObservation)
+    assert decoded.value.observation.totals == {"cpu": "50", "memory": "200Gi"}
 
 
 def test_session_bad_id_returns_bad_request() -> None:

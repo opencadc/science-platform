@@ -21,15 +21,20 @@ interface PodUsageProvider {
      * Fetch per-pod CPU and memory usage for session workloads.
      *
      * @param userID constrain by user ID when non-null/non-blank; ignored by the backend provider
-     * @param omitHeadless when true, exclude headless session pods; ignored by the backend provider
+     * @param interactiveOnly when true, exclude headless and batch session pods; ignored by the backend provider
      * @param sessionJobs listed session Jobs; required for the backend provider to map session usage to job names
      */
-    PodMetrics getPodMetrics(String userID, boolean omitHeadless, List<Job> sessionJobs) throws Exception;
+    PodMetrics getPodMetrics(String userID, boolean interactiveOnly, List<Job> sessionJobs) throws Exception;
 
-    static PodUsageProvider fromEnvironment() {
+    /**
+     * The provider {@link #SKAHA_POD_METRICS_SOURCE} selects.
+     *
+     * @param sessionMetricsDAO the Metrics session client, or null when Metrics is not configured
+     */
+    static PodUsageProvider fromEnvironment(final SessionMetricsDAO sessionMetricsDAO) {
         final String source = System.getenv(SKAHA_POD_METRICS_SOURCE);
         if (SOURCE_BACKEND.equalsIgnoreCase(source)) {
-            return new MetricsBackendPodUsageProvider(SessionMetricsDAO.fromEnvironmentOrNull());
+            return new MetricsBackendPodUsageProvider(sessionMetricsDAO);
         }
         return new KubernetesPodUsageProvider(new PodMetricsDAO());
     }

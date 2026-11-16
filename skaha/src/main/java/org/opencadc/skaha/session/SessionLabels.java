@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Canonical Kubernetes label keys and selector builders for Skaha sessions.
@@ -23,8 +24,12 @@ public final class SessionLabels {
     private static final String ACCELERATOR_NONE = "none";
     static final String FLAVOR_FIXED = "fixed";
     static final String FLAVOR_FLEXIBLE = "flexible";
-    private static final String HEADLESS = "headless";
     private static final String DESKTOP_APP = "desktop-app";
+    // Kinds that run unattended; the interactive listing leaves them out.
+    private static final List<String> UNATTENDED_KINDS = Stream.of(SessionType.values())
+            .filter(type -> !type.isInteractive())
+            .map(type -> type.applicationName)
+            .toList();
     private static final String KUEUE_QUEUE_NAME = "kueue.x-k8s.io/queue-name";
     private static final String KUEUE_PRIORITY_CLASS = "kueue.x-k8s.io/priority-class";
     private static final Pattern KUBERNETES_LABEL_VALUE = Pattern.compile("[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?");
@@ -119,8 +124,12 @@ public final class SessionLabels {
         return selector(labelEquals(Key.ID, sessionID), labelEquals(Key.USERNAME, username));
     }
 
-    /** Selector for session listings and pod metrics. */
-    public static String forUserSessions(final String username, final String sessionID, final boolean omitHeadless) {
+    /**
+     * Selector for session listings and pod metrics.
+     *
+     * @param interactiveOnly Leave out the unattended kinds (headless and batch), as {@link #interactive} does.
+     */
+    public static String forUserSessions(final String username, final String sessionID, final boolean interactiveOnly) {
         final List<String> requirements = new ArrayList<>();
         if (StringUtil.hasText(sessionID)) {
             requirements.add(labelEquals(Key.ID, sessionID));
@@ -128,10 +137,15 @@ public final class SessionLabels {
         if (StringUtil.hasText(username)) {
             requirements.add(labelEquals(Key.USERNAME, username));
         }
-        if (omitHeadless) {
-            requirements.add(labelNotEquals(Key.KIND, HEADLESS));
+        if (interactiveOnly) {
+            UNATTENDED_KINDS.forEach(kind -> requirements.add(labelNotEquals(Key.KIND, kind)));
         }
         return selector(requirements.toArray(new String[0]));
+    }
+
+    /** False for a session object of an unattended kind (headless or batch), which the interactive listing omits. */
+    static boolean interactive(final HasMetadata resource) {
+        return !UNATTENDED_KINDS.contains(get(resource, Key.KIND));
     }
 
     /** Selector for one desktop application job. */
