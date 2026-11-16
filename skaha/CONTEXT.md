@@ -25,8 +25,9 @@ _Avoid_: "k8s config" (ambiguous).
 detail).
 
 **MetricsDAO**: The single Skaha seam for all metrics access — **platform
-stats** capacity/allocation and session-list pod usage. Callers use
-`MetricsDAO` only; platform HTTP and pod-usage source selection are internal.
+stats** capacity/allocation, session-list pod usage, and Metrics session
+reports for **batches**. Callers use `MetricsDAO` only; platform HTTP and
+pod-usage source selection are internal.
 _Avoid_: `SkahaMetricsDAO`, `PlatformMetricsDAO`, `PodMetricsDAO` in
 session-layer specs (implementation details).
 
@@ -46,6 +47,14 @@ carry user, allocation class (`fixed` / `flexible`), and exactly one configured
 session-type label. Label keys are configured in Metrics; values are set at
 session launch. See
 [system ADR-0004](../docs/adr/0004-interactive-workload-pod-label-contract.md).
+
+**Batch**: A session of kind `batch`: one Indexed Job of up to 256
+**replicas**, admitted by Kueue at a partial width. Unattended like headless:
+not capped and not in `view=interactive`. `GET /v1/session/{id}` returns the
+Batch document. _Avoid_: "job array", "parallel headless".
+
+**Replica**: One index of a **batch**, `0` to `replicas - 1`. Each succeeds or
+fails once. Its log is `GET /v1/session/{id}?view=logs&replica=<n>`.
 
 **Session Job cache**: Each Skaha replica's watched copy of session Jobs, used
 for a user's session listing. Lookups by session ID and the max-sessions check

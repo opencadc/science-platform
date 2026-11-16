@@ -82,6 +82,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -145,6 +146,8 @@ public class PostAction extends SessionAction {
     // to a job name to form a pod name, we limit the job name length to 57 characters.
     private static final int MAX_JOB_NAME_LENGTH = 57;
     private static final String DESKTOP_SESSION_APP_TOKEN = "software.desktop.app.token";
+    // Skaha sets CANFAR_* variables on session containers, and the canfar client reads its settings ignoring case.
+    private static final String RESERVED_ENV_PREFIX = "CANFAR_";
 
     private static final Logger log = Logger.getLogger(PostAction.class);
     private final UserStorageClient userStorageClient;
@@ -191,9 +194,21 @@ public class PostAction extends SessionAction {
 
                 validateName(name);
 
-                // check for no existing session for this user
-                // (rule: only 1 session of same type per user allowed)
-                checkExistingSessions(validatedType);
+                final BatchSpec batch = BatchSpec.fromRequest(
+                        validatedType, syncInput.getParameter("replicas"), syncInput.getParameter("maxfail"));
+                final List<String> env = syncInput.getParameters("env");
+                requireNoReservedEnv(env);
+                final SessionJobBuilder.HeadlessCommand command = validatedType.isInteractive()
+                        ? null
+                        : SessionJobBuilder.HeadlessCommand.fromRequest(
+                                syncInput.getParameter("cmd"), syncInput.getParameter("args"), env);
+
+                if (validatedType.isInteractive()) {
+                    // Live, not cached: concurrent launches by the same user must see each other.
+                    checkExistingSessions(SessionDAO.liveJobs(this.posixPrincipal.username, null, true).stream()
+                            .map(job -> SessionBuilder.fromJob(job, PodResourceUsage.empty()))
+                            .collect(Collectors.toList()));
+                }
 
                 // create a new session id
                 // (VNC passwords are only good up to 8 characters)
@@ -215,10 +230,7 @@ public class PostAction extends SessionAction {
 
                 this.userStorageClient.ensureUserBase(getUsername());
 
-                final String cmd = syncInput.getParameter("cmd");
-                final String args = syncInput.getParameter("args");
-                final List<String> envs = syncInput.getParameters("env");
-                createSession(validatedType, image, name, resourceSpecification, gpus, cmd, args, envs);
+                createSession(validatedType, image, name, resourceSpecification, gpus, command, batch);
                 // return the session id
                 syncOutput.setHeader("Content-Type", "text/plain");
                 syncOutput.getOutputStream().write((sessionID + "\n").getBytes());
@@ -297,36 +309,37 @@ public class PostAction extends SessionAction {
         throw new IllegalArgumentException("image not in a trusted repository");
     }
 
-    private void checkExistingSessions(final SessionType type) throws Exception {
-        // Live, not cached: concurrent launches by the same user must see each other.
-        checkExistingSessions(
-                type,
-                SessionDAO.liveJobs(this.posixPrincipal.username, null, true).stream()
-                        .map(job -> SessionBuilder.fromJob(job, PodResourceUsage.empty()))
-                        .collect(Collectors.toList()));
+    /**
+     * Refuse an interactive launch when the user's active interactive sessions (not headless, batch or desktop-app)
+     * reach the limit. Headless and batch launches are not capped.
+     *
+     * @param sessions The user's interactive sessions.
+     */
+    void checkExistingSessions(final List<Session> sessions) {
+        Objects.requireNonNull(sessions, "sessions must not be null");
+
+        final long count = sessions.stream()
+                .filter(session -> !TYPE_DESKTOP_APP.equals(session.getType()))
+                .filter(session -> session.getStatus().equalsIgnoreCase(Session.STATUS_RUNNING)
+                        || session.getStatus().equalsIgnoreCase(Session.STATUS_PENDING))
+                .count();
+
+        log.debug("active interactive sessions: " + count);
+        if (count >= maxUserSessions) {
+            throw new IllegalArgumentException(
+                    "User " + getUsername() + " has reached the maximum of " + maxUserSessions + " active sessions.");
+        }
     }
 
     /**
-     * Check the count of existing non-headless and non desktop-app sessions for the user.
-     *
-     * @param type The type of desired session to ensure not headless.
-     * @param sessions The list of existing Session objects for the user.
+     * Refuse a request {@code env} entry whose name starts with {@code CANFAR_}, in any case. Applies to every session
+     * type, including those that ignore {@code env}.
      */
-    void checkExistingSessions(final SessionType type, final List<Session> sessions) {
-        Objects.requireNonNull(type, "type must not be null");
-        Objects.requireNonNull(sessions, "sessions must not be null");
-
-        if (!type.isHeadless()) {
-            final long count = sessions.stream()
-                    .filter(session -> !TYPE_DESKTOP_APP.equals(session.getType()))
-                    .filter(session -> session.getStatus().equalsIgnoreCase(Session.STATUS_RUNNING)
-                            || session.getStatus().equalsIgnoreCase(Session.STATUS_PENDING))
-                    .count();
-
-            log.debug("active interactive sessions: " + count);
-            if (count >= maxUserSessions) {
-                throw new IllegalArgumentException("User " + getUsername() + " has reached the maximum of "
-                        + maxUserSessions + " active sessions.");
+    private static void requireNoReservedEnv(final List<String> envs) {
+        for (final String env : Objects.requireNonNullElse(envs, List.<String>of())) {
+            if (env.toUpperCase(Locale.ROOT).startsWith(RESERVED_ENV_PREFIX)) {
+                throw new IllegalArgumentException("env name " + env.split("=", 2)[0]
+                        + " is reserved: names starting with " + RESERVED_ENV_PREFIX + " are set by the platform.");
             }
         }
     }
@@ -337,15 +350,14 @@ public class PostAction extends SessionAction {
             String name,
             ResourceSpecification resourceSpecification,
             Integer gpus,
-            String cmd,
-            String args,
-            List<String> envs)
+            SessionJobBuilder.HeadlessCommand command,
+            BatchSpec batch)
             throws Exception {
 
         String supplementalGroups = getSupplementalGroupsList();
         log.debug("supplementalGroups are " + supplementalGroups);
 
-        final String jobName = K8SUtil.getJobName(sessionID, type, posixPrincipal.username);
+        final String jobName = type.jobName(sessionID, posixPrincipal.username);
         final UserStorageConfiguration userStorageConfiguration = UserStorageConfiguration.fromEnv();
         final String owner = getUsername();
 
@@ -382,12 +394,13 @@ public class PostAction extends SessionAction {
                         Integer.toString(Math.max(1, resourceSpecification.requestCores.intValue())))
                 .withParameter(
                         PostAction.SKAHA_SUPPLEMENTALGROUPS,
-                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "");
+                        StringUtil.hasText(supplementalGroups) ? supplementalGroups : "")
+                .withHeadlessCommand(command)
+                .withBatch(batch);
 
+        // The headless PriorityClass lets a group's headless Pods preempt; a batch stays preemptible.
         if (type.isHeadless()) {
-            sessionJobBuilder = sessionJobBuilder
-                    .withHeadlessCommand(SessionJobBuilder.HeadlessCommand.fromRequest(cmd, args, envs))
-                    .withPriorityClass(getHeadlessPriorityClass());
+            sessionJobBuilder = sessionJobBuilder.withPriorityClass(getHeadlessPriorityClass());
         } else if (type == SessionType.DESKTOP) {
             sessionJobBuilder = sessionJobBuilder.withParameter(PostAction.DESKTOP_SESSION_APP_TOKEN, generateToken());
         } else if (type == SessionType.CARTA) {

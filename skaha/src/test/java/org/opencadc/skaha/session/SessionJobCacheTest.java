@@ -78,6 +78,19 @@ public class SessionJobCacheTest {
         Assert.assertEquals(List.of("skaha-notebook-alice-a1"), names(this.cache.userJobs("alice", false)));
     }
 
+    @Test
+    public void interactiveListingLeavesOutHeadlessAndBatch() throws Exception {
+        create(job("skaha-notebook-alice-n1", "alice", "n1", "notebook"));
+        create(job("skaha-headless-alice-h1", "alice", "h1", "headless"));
+        create(job("batch-b1", "alice", "b1", "batch"));
+        this.cache.start().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        Assert.assertEquals(List.of("skaha-notebook-alice-n1"), names(this.cache.userJobs("alice", true)));
+        Assert.assertEquals(
+                List.of("batch-b1", "skaha-headless-alice-h1", "skaha-notebook-alice-n1"),
+                names(this.cache.userJobs("alice", false)));
+    }
+
     private Job create(final Job job) {
         return this.api
                 .client()

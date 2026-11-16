@@ -14,9 +14,12 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 import org.apache.log4j.Logger;
@@ -28,6 +31,12 @@ final class SessionPods {
     private static final Logger LOGGER = Logger.getLogger(SessionPods.class);
 
     static final String DEFAULT_CONTAINER_ANNOTATION = "kubectl.kubernetes.io/default-container";
+
+    /** Oldest Pod first; a Pod without a creation time sorts before every other. */
+    static final Comparator<Pod> BY_CREATION = Comparator.comparing(
+            (Pod pod) -> pod.getMetadata().getCreationTimestamp(),
+            Comparator.nullsFirst(Comparator.comparing(Instant::parse)));
+
     private static final String[] EVENT_COLUMNS = {"TYPE", "REASON", "MESSAGE", "FIRST-TIME", "LAST-TIME"};
 
     // kubectl's tabwriter settings (k8s.io/cli-runtime printers): minimum cell width 6, padding 3.
@@ -111,13 +120,38 @@ final class SessionPods {
     /** Write each session Pod's log from its default container. Pods whose container has not started are skipped. */
     static void streamLogs(final String username, final String sessionID, final OutputStream out) throws IOException {
         for (final Pod pod : pods(username, sessionID)) {
-            final HttpResponse<InputStream> response = getLog(pod.getMetadata().getName(), defaultContainer(pod));
-            try (InputStream log = response.body()) {
-                if (response.isSuccessful()) {
-                    log.transferTo(out);
-                } else {
-                    LOGGER.debug("No logs for " + pod.getMetadata().getName() + ": HTTP " + response.code());
-                }
+            streamLog(pod, out);
+        }
+        out.flush();
+    }
+
+    /**
+     * The newest Pod of one batch replica.
+     *
+     * @throws ResourceNotFoundException When the replica has no Pod.
+     */
+    static Pod replicaPod(final String username, final String sessionID, final int replica)
+            throws ResourceNotFoundException {
+        return SkahaKubernetesClient.get()
+                .pods()
+                .withLabelSelector(
+                        SessionLabels.forSession(username, sessionID) + "," + Batch.COMPLETION_INDEX + "=" + replica)
+                .list()
+                .getItems()
+                .stream()
+                .max(BY_CREATION)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "replica " + replica + " of session " + sessionID + " has no Pod"));
+    }
+
+    /** Write one Pod's log from its app container; nothing when the container has not started. */
+    static void streamLog(final Pod pod, final OutputStream out) throws IOException {
+        final HttpResponse<InputStream> response = getLog(pod.getMetadata().getName(), appContainer(pod));
+        try (InputStream log = response.body()) {
+            if (response.isSuccessful()) {
+                log.transferTo(out);
+            } else {
+                LOGGER.debug("No logs for " + pod.getMetadata().getName() + ": HTTP " + response.code());
             }
         }
         out.flush();
@@ -160,8 +194,11 @@ final class SessionPods {
         }
     }
 
-    private static String defaultContainer(final Pod pod) {
-        final String annotated = pod.getMetadata().getAnnotations().get(DEFAULT_CONTAINER_ANNOTATION);
+    /** The container that runs the session's image: the annotated default, else the first. */
+    static String appContainer(final Pod pod) {
+        final String annotated = Objects.requireNonNullElse(
+                        pod.getMetadata().getAnnotations(), Map.<String, String>of())
+                .get(DEFAULT_CONTAINER_ANNOTATION);
         return annotated != null
                 ? annotated
                 : pod.getSpec().getContainers().get(0).getName();

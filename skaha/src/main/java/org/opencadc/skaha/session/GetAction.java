@@ -67,13 +67,18 @@
 
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.net.TransientException;
 import ca.nrc.cadc.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import io.fabric8.kubernetes.api.model.Pod;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
@@ -157,11 +162,18 @@ public class GetAction extends SessionAction {
                 syncOutput.setHeader("Content-Type", "application/json");
                 syncOutput.getOutputStream().write(json.getBytes());
             } else {
+                final Optional<Job> job = SessionDAO.sessionJob(getUsername(), sessionID);
+                this.batchSession = job.filter(Batch::is).isPresent();
                 if (SESSION_VIEW_LOGS.equals(view)) {
-                    // return the container log
+                    // Find a batch replica's Pod before writing, so a bad replica still gets its error status.
+                    final Pod replicaPod = replicaPod(job, syncInput.getParameter("replica"));
                     syncOutput.setHeader("Content-Type", "text/plain");
                     syncOutput.setCode(200);
-                    streamContainerLogs(sessionID, syncOutput.getOutputStream());
+                    if (replicaPod == null) {
+                        streamContainerLogs(sessionID, syncOutput.getOutputStream());
+                    } else {
+                        SessionPods.streamLog(replicaPod, syncOutput.getOutputStream());
+                    }
                 } else if (SESSION_VIEW_EVENTS.equals(view)) {
                     // return the event logs
                     String logs = getEventLogs(sessionID);
@@ -169,7 +181,8 @@ public class GetAction extends SessionAction {
                     syncOutput.getOutputStream().write(logs.getBytes());
                 } else {
                     // return the session
-                    String json = getSingleSession(sessionID);
+                    String json = getSingleSession(job.orElseThrow(
+                            () -> new ResourceNotFoundException("session " + sessionID + " not found")));
                     syncOutput.setHeader("Content-Type", "application/json");
                     syncOutput.getOutputStream().write(json.getBytes());
                 }
@@ -269,10 +282,47 @@ public class GetAction extends SessionAction {
         return gson.toJson(session);
     }
 
-    public String getSingleSession(String sessionID) throws Exception {
-        Session session = this.getSession(getUsername(), sessionID);
+    /**
+     * The session's JSON; for a batch, the Batch document, whose resources are unavailable when the Metrics report
+     * cannot be read.
+     */
+    String getSingleSession(final Job job) throws Exception {
+        if (Batch.is(job)) {
+            return DOCUMENTS.writeValueAsString(Batch.of(
+                    job,
+                    SessionPods.pods(getUsername(), this.sessionID),
+                    metricsDAO().getSessionMetrics(Set.of(this.sessionID)).get(this.sessionID),
+                    Instant.now()));
+        }
+        final Session session = SessionDAO.toSession(getUsername(), job);
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
         return gson.toJson(session);
+    }
+
+    /**
+     * The Pod whose log a batch log request names.
+     *
+     * @param job The session's Job, if it has one.
+     * @param replica The {@code replica} parameter: required for a batch, refused for any other session.
+     * @return The newest Pod of that replica, or null for a session that is not a batch.
+     * @throws IllegalArgumentException When a batch request has no valid replica, or another session's request has one.
+     * @throws ResourceNotFoundException When a replica is named and there is no such session, or the replica has no
+     *     Pod.
+     */
+    private Pod replicaPod(final Optional<Job> job, final String replica) throws ResourceNotFoundException {
+        if (this.batchSession) {
+            return SessionPods.replicaPod(
+                    getUsername(),
+                    this.sessionID,
+                    BatchSpec.fromJob(job.orElseThrow()).replicaIndex(replica));
+        }
+        if (replica == null) {
+            return null;
+        }
+        if (job.isEmpty()) {
+            throw new ResourceNotFoundException("session " + this.sessionID + " not found");
+        }
+        throw new IllegalArgumentException("replica is valid only for a batch.");
     }
 
     /**

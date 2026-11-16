@@ -106,10 +106,15 @@ final class SessionRequests extends ExternalResource {
     /** What the action wrote, and the HTTP code when run through {@link SkahaAction#run()}. */
     static final class Response {
         final ByteArrayOutputStream body = new ByteArrayOutputStream();
+        final Map<String, Object> headers = new HashMap<>();
         int code = 200;
 
         String text() {
             return this.body.toString(StandardCharsets.UTF_8);
+        }
+
+        Object contentType() {
+            return this.headers.get("Content-Type");
         }
     }
 
@@ -276,7 +281,9 @@ final class SessionRequests extends ExternalResource {
         }
 
         @Override
-        public void setHeader(final String name, final Object value) {}
+        public void setHeader(final String name, final Object value) {
+            this.response.headers.put(name, value);
+        }
 
         @Override
         public void addHeader(final String name, final Object value) {}
