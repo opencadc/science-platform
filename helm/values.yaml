@@ -646,6 +646,11 @@ metrics:
     namespaces: []
   # -- Fixed replica count for the Metrics API (no HPA in this chart version).
   replicaCount: 1
+  # Optional YAML for affinity.nodeAffinity on the Metrics API Pod Spec. Use this to keep
+  # Metrics off GPU or other specialized nodes. Independent of deployment.skaha.nodeAffinity;
+  # omit or leave empty to skip the affinity stanza.
+  # See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/
+  # nodeAffinity: {}
   image:
     # -- Metrics container image repository.
     repository: images.opencadc.org/platform/metrics

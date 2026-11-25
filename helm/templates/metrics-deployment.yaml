@@ -23,6 +23,11 @@ spec:
     spec:
       serviceAccountName: {{ include "skaha.serviceAccountName" . }}
       automountServiceAccountToken: true
+{{- with $mb.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+{{ . | toYaml | indent 10 }}
+{{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532

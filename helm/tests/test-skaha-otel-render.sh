@@ -407,6 +407,28 @@ metrics_probe_render="$(
 assert_readiness_probe "${metrics_probe_render}"
 assert_liveness_probe "${metrics_probe_render}"
 
+metrics_affinity_unset_render="$(render_metrics_deployment)"
+assert_not_contains "${metrics_affinity_unset_render}" "nodeAffinity"
+
+metrics_affinity_values="$(mktemp)"
+cat >"${metrics_affinity_values}" <<'EOF'
+metrics:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: nvidia.com/gpu
+              operator: DoesNotExist
+EOF
+metrics_affinity_render="$(
+    render_metrics_deployment \
+        -f "${metrics_affinity_values}"
+)"
+rm -f "${metrics_affinity_values}"
+assert_contains "${metrics_affinity_render}" "nodeAffinity:"
+assert_contains "${metrics_affinity_render}" "nvidia.com/gpu"
+assert_contains "${metrics_affinity_render}" "DoesNotExist"
+
 metrics_env_render="$(
     helm template metrics-env-test "${chart_dir}" \
         --show-only templates/metrics-deployment.yaml \

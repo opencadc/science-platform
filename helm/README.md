@@ -113,6 +113,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | metrics.rbac.namespaces | list | `[]` | Namespaces in which Metrics lists LocalQueues for User metrics. Required; these must match METRICS_PROVIDERS__KUEUE__NAMESPACES when both are supplied. |
 | metrics.redis.url | string | `""` | Optional `redis://` or `rediss://` URL for the Metrics cache. Empty uses this release's bundled Redis (`<release>-redis-master`, database 0), shared with Skaha. |
 | metrics.replicaCount | int | `1` | Fixed replica count for the Metrics API (no HPA in this chart version). |
+| metrics.nodeAffinity | object | `{}` | Optional nodeAffinity for the Metrics API Pod. Independent of deployment.skaha.nodeAffinity. |
 | metrics.resources | object | `{"limits":{"cpu":"1","memory":"1Gi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Resource requests and limits for the Metrics API container. |
 | metrics.revisionHistoryLimit | int | `3` | revisionHistoryLimit for the Metrics API Deployment. |
 | metrics.test.enabled | bool | `true` | Run helm test hook that retries /readyz until success. |
