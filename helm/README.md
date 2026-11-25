@@ -106,6 +106,7 @@ A Helm chart to install the Skaha web service of the CANFAR Science Platform
 | metrics.networkPolicy.ingress | object | `{"additional":[],"skaha":{"ports":[{"port":8000,"protocol":"TCP"}]}}` | Allow only the co-deployed Skaha API to call Metrics; the template derives its exact `run` selector from the release name. |
 | metrics.networkPolicy.ingress.additional | list | `[]` | Additional raw NetworkPolicy ingress rules. These are appended unchanged. |
 | metrics.networkPolicy.ingress.skaha.ports | list | `[{"port":8000,"protocol":"TCP"}]` | Port rules for the co-deployed Skaha caller. An explicitly empty list denies this caller. |
+| metrics.nodeAffinity | object | `{}` | Optional YAML for affinity.nodeAffinity on the Metrics API Pod Spec. Keep Metrics off GPU or other specialized nodes. Independent of deployment.skaha.nodeAffinity; empty omits the affinity stanza. See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/ |
 | metrics.otlp | object | `{"endpoint":""}` | Optional external OTLP/HTTP endpoint for Metrics application-state metrics. When set, the chart enables OTLP metrics export. |
 | metrics.platformName | string | `"canfar"` | Public Metrics platform subject (path .../platform/{name} and Skaha client). Default canfar. Sets METRICS_PLATFORM_NAME and SKAHA_METRICS_PLATFORM_NAME unless overridden in env maps. |
 | metrics.prometheus | object | `{"url":""}` | Optional Prometheus/Mimir HTTP(S) endpoint for server-owned efficiency queries. When set, the chart enables the fixed PromQL provider. |

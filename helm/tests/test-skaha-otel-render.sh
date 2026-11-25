@@ -425,9 +425,18 @@ metrics_affinity_render="$(
         -f "${metrics_affinity_values}"
 )"
 rm -f "${metrics_affinity_values}"
-assert_contains "${metrics_affinity_render}" "nodeAffinity:"
-assert_contains "${metrics_affinity_render}" "nvidia.com/gpu"
-assert_contains "${metrics_affinity_render}" "DoesNotExist"
+# Exact PodSpec affinity stanza (including indent) so a mis-indented template fails.
+assert_contains "${metrics_affinity_render}" "$(cat <<'EOF'
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu
+                operator: DoesNotExist
+      securityContext:
+EOF
+)"
 
 metrics_env_render="$(
     helm template metrics-env-test "${chart_dir}" \
