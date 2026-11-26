@@ -508,7 +508,7 @@ removed static queue settings, and when Metrics does not list that ClusterQueue.
 {{- end -}}
 {{- if ne (len $selected) 1 -}}
 {{- fail "deployment.skaha.sessions.communities requires exactly one entry with default: true" -}}
-{{- end -}}
+{{- else -}}
 {{- $name := index $selected 0 -}}
 {{- $entry := get $communities $name -}}
 {{- $clusterQueue := trim (default "" $entry.clusterQueue | toString) -}}
@@ -519,6 +519,7 @@ removed static queue settings, and when Metrics does not list that ClusterQueue.
 {{- fail (printf "ClusterQueue %q routed by deployment.skaha.sessions.communities is missing from METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES" $clusterQueue) -}}
 {{- end -}}
 {{- dict "community" $name "clusterQueue" $clusterQueue | toJson -}}
+{{- end -}}
 {{- end -}}
 
 {{/*

@@ -3,10 +3,15 @@ set -euo pipefail
 
 chart_dir="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
-metrics_required_args=(
+metrics_base_args=(
     --set metrics.clusterName=prod-cluster
     --set-string 'metrics.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["metrics-workloads"]'
     --set-string 'metrics.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["cq-test"]'
+)
+
+metrics_required_args=(
+    "${metrics_base_args[@]}"
+    --set deployment.skaha.sessions.communities.cadc.default=true
     --set deployment.skaha.sessions.communities.cadc.clusterQueue=cq-test
 )
 
@@ -18,9 +23,14 @@ if helm show values "${chart_dir}" | grep -Eq '^[[:space:]]*cacheBackend:'; then
 fi
 
 render_skaha_deployment() {
+    local -a render_args=("${metrics_required_args[@]}")
+    if [[ "${1:-}" == --no-cadc ]]; then
+        render_args=("${metrics_base_args[@]}")
+        shift
+    fi
     helm template otel-test "${chart_dir}" \
         --show-only templates/skaha-tomcat-deployment.yaml \
-        "${metrics_required_args[@]}" \
+        "${render_args[@]}" \
         --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
         "$@"
 }
@@ -192,13 +202,21 @@ assert_env_value "${queue_render}" "SKAHA_QUEUE_DESKTOP-APP_PRIORITY_CLASS" "med
 assert_not_contains "${queue_render}" "SKAHA_QUEUE_DEFAULT_NAME"
 
 default_community_render="$(
-    render_skaha_deployment \
-        --set deployment.skaha.sessions.communities.cadc=null \
+    render_skaha_deployment --no-cadc \
         --set deployment.skaha.sessions.communities.default.default=true \
         --set deployment.skaha.sessions.communities.default.clusterQueue=cq-test
 )"
 assert_env_value "${default_community_render}" "SKAHA_DEFAULT_COMMUNITY" "default"
 assert_env_value "${default_community_render}" "SKAHA_DEFAULT_CLUSTER_QUEUE" "cq-test"
+
+kawfee_render="$(
+    render_skaha_deployment --no-cadc \
+        --set-string 'metrics.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES=["kawfee"]' \
+        --set deployment.skaha.sessions.communities.kawfee.default=true \
+        --set deployment.skaha.sessions.communities.kawfee.clusterQueue=kawfee
+)"
+assert_env_value "${kawfee_render}" "SKAHA_DEFAULT_COMMUNITY" "kawfee"
+assert_env_value "${kawfee_render}" "SKAHA_DEFAULT_CLUSTER_QUEUE" "kawfee"
 
 assert_render_fails \
     "deployment.skaha.sessions.kueue.default.queueName was removed" \
@@ -212,7 +230,7 @@ assert_render_fails \
     --set deployment.skaha.sessions.communities.cadc.clusterQueue=
 assert_render_fails \
     "deployment.skaha.sessions.communities.default.clusterQueue is required" \
-    --set deployment.skaha.sessions.communities.cadc=null \
+    --no-cadc \
     --set deployment.skaha.sessions.communities.default.default=true \
     --set deployment.skaha.sessions.communities.default.clusterQueue=
 assert_render_fails \

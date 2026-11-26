@@ -62,6 +62,8 @@ def validate_shared_identity():
         "--set",
         "deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://example.org~cavern",
         "--set",
+        "deployment.skaha.sessions.communities.cadc.default=true",
+        "--set",
         "deployment.skaha.sessions.communities.cadc.clusterQueue=cq-test",
     ]
     cases = [

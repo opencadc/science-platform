@@ -328,20 +328,23 @@ deployment:
 
       # Every session Job is suspended onto a private LocalQueue for its owner. Skaha creates that LocalQueue on
       # first launch and never deletes it. Install Kueue and the Community ClusterQueue yourself; this chart does not.
-      # The map key is the Community name stamped as canfar.net/community. Exactly one entry sets default: true.
+      #
+      # communities starts empty. Helm merges map keys, so a community left in this file stays beside whatever you
+      # add in your own values. Set the whole map yourself. Do not rely on a built-in name.
+      #
+      # The map key is the Community name. Skaha stamps it as canfar.net/community. Set exactly one entry to
+      # default: true. That is the Community used when a launch does not name one. clusterQueue is the Kueue
+      # ClusterQueue for that Community. Create that ClusterQueue first, set its canfar.net/community label to the
+      # same map key, and list the ClusterQueue name in metrics.env.METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES.
+      # Two entries with default: true, a missing clusterQueue, or a name that is not in that list fail the render.
       # @see https://kueue.sigs.k8s.io/docs/
       # Example:
       #   communities:
       #     cadc:
       #       default: true
       #       clusterQueue: cadc
-      # -- Communities keyed by Community name. Exactly one entry sets default true.
-      communities:
-        cadc:
-          # -- True on the Community Skaha routes to. Exactly one entry in the map must be true.
-          default: true
-          # -- ClusterQueue for this Community. Its canfar.net/community label must equal the map key, and the name must be listed in METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES.
-          clusterQueue: ""
+      # -- Communities keyed by Community name. Empty until you set exactly one entry with default true and its clusterQueue. The ClusterQueue label canfar.net/community must equal the map key, and the name must be listed in METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES.
+      communities: {}
 
       # Kueue WorkloadPriorityClass per session type (e.g. notebook, desktop, headless, desktop-app), with default as
       # the fallback for unlisted types. Omit every type to use Kueue's default priority.
