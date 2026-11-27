@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.7.0](https://github.com/opencadc/science-platform/compare/1.6.3...1.7.0) (2026-11-25)
+
+
+### Features
+
+* add node affinity for metrics service ([9146ea4](https://github.com/opencadc/science-platform/commit/9146ea41f55a2ee877df8d8bf0bea9b7affebbc2))
+* add node affinity for metrics service ([98ba62a](https://github.com/opencadc/science-platform/commit/98ba62aaa7ed4ec464c4cf98afb553204cad796f))
+
+
+### Bug Fixes
+
+* modified test and ensure empty object for node affinity ([8b244d5](https://github.com/opencadc/science-platform/commit/8b244d5afb9b118d91716b1ce966afd5873393d9))
+* update readme with helm docs ([d28d04e](https://github.com/opencadc/science-platform/commit/d28d04ec58bbf4a9a2e3e493cb66da822859e15d))
+
+## [1.6.3](https://github.com/opencadc/science-platform/compare/1.6.2...1.6.3) (2026-11-04)
+
+
+### Bug Fixes
+
+* cve fixes from jackson library ([5bb36e6](https://github.com/opencadc/science-platform/commit/5bb36e6ed6b08c3cbaffc55b12ee17961d91b340))
+
 ## [1.6.2](https://github.com/opencadc/science-platform/compare/1.6.1...1.6.2) (2026-11-03)
 
 

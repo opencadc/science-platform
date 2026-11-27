@@ -1,7 +1,7 @@
 # Production Metrics image: locked uv install into python:3.13-slim, one worker.
 # Base images are pinned by digest; Dependabot (.github/dependabot.yml) bumps
 # the tag and digest together so security patches still arrive.
-FROM ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.10@sha256:a3ea1357342c1a4bf9a0c53a3deb1b55379aefa037338d8113d5771efa01774f AS uv
 
 # Stay on 3.13: pydantic-core ships cp313/cp314 wheels only; 3.15 forces a
 # source build and slim has no C compiler (CI kind-smoke linker `cc` not found).
