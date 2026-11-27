@@ -248,21 +248,23 @@ public class SessionLaunchFailureTest {
 
     @Test
     public void launch() throws Exception {
+        this.api.clusterQueue("cq", "default");
         this.scenario.api().accept(this.api.server());
         final Job job = job(this.scenario.appID(), null);
+        final SessionJobBuilder.LaunchArtifacts launch =
+                new SessionJobBuilder.LaunchArtifacts(job, labels(job), SessionFixtures.ASSIGNMENT);
 
         try (KubernetesClient client = this.api.client(this.scenario.requestTimeoutMillis())) {
             final SessionLauncher launcher = new SessionLauncher(client);
             if (this.scenario.error() == null) {
-                final Job launched = launcher.launch(job, labels(job), this.scenario.owned());
+                final Job launched = launcher.launch(launch, this.scenario.owned());
                 Assert.assertEquals(JOB_NAME, launched.getMetadata().getName());
                 if (this.scenario.uid() != null) {
                     Assert.assertEquals(
                             this.scenario.uid(), launched.getMetadata().getUid());
                 }
             } else {
-                Assert.assertThrows(
-                        this.scenario.error(), () -> launcher.launch(job, labels(job), this.scenario.owned()));
+                Assert.assertThrows(this.scenario.error(), () -> launcher.launch(launch, this.scenario.owned()));
             }
         }
 
@@ -311,8 +313,10 @@ public class SessionLaunchFailureTest {
                 .withUid(uid)
                 .addToLabels(SessionLabels.Key.ID.label(), SessionFixtures.SESSION_ID)
                 .addToLabels(SessionLabels.Key.KIND.label(), "notebook")
+                .addToLabels(SessionLabels.kueue(SessionFixtures.ASSIGNMENT))
                 .endMetadata()
                 .withNewSpec()
+                .withSuspend(true)
                 .withNewTemplate()
                 .withNewSpec()
                 .addNewContainer()

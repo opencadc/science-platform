@@ -45,6 +45,11 @@ rules:
 - apiGroups: ["metrics.k8s.io"]
   resources: ["pods"]
   verbs: ["get", "list"]
+
+# Per-user LocalQueues: created on first launch, missing identity labels added. Never updated or deleted.
+- apiGroups: ["kueue.x-k8s.io"]
+  resources: ["localqueues"]
+  verbs: ["create", "get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

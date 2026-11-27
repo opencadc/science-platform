@@ -44,6 +44,7 @@ def test_topology_uses_v1beta2_clusterqueues_and_labelled_localqueues() -> None:
         for name, queue in cluster_queues.items()
     }
     assert all(communities.values())
+    assert len(set(communities.values())) == len(communities)
     assert all("cohortName" not in queue["spec"] for queue in cluster_queues.values())
 
     local_queues = [item for item in documents if item["kind"] == "LocalQueue"]

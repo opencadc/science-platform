@@ -14,6 +14,7 @@ import java.util.Map;
  */
 final class SessionFixtures {
     static final String USER = "alice";
+    static final LaunchAssignment ASSIGNMENT = new LaunchAssignment("skaha-workload", USER, "default", "cq", null);
     static final String SESSION_ID = "abc123";
 
     private SessionFixtures() {}
@@ -57,7 +58,7 @@ final class SessionFixtures {
                     PostAction.SOFTWARE_CONTAINERPARAM, "terminal",
                     PostAction.SKAHA_JOBUID, "parent-uid"));
         }
-        return SessionJobBuilder.fromPath(template("launch-" + kind + ".yaml"))
+        return SessionJobBuilder.fromPath(template("launch-" + kind + ".yaml"), ASSIGNMENT)
                 .withParameters(parameters)
                 .withImage(image(kind));
     }
@@ -71,7 +72,6 @@ final class SessionFixtures {
         parameters.put(PostAction.SKAHA_JOBNAME, "skaha-" + kind + "-alice-" + SESSION_ID);
         parameters.put(PostAction.SKAHA_HOSTNAME, "skaha.example.org");
         parameters.put(PostAction.SKAHA_SESSIONS_HOSTNAME, "sessions.example.org");
-        parameters.put(PostAction.SKAHA_USERID, USER);
         parameters.put(PostAction.SKAHA_POSIXID, "20001");
         parameters.put(PostAction.SKAHA_SESSIONTYPE, kind);
         parameters.put(PostAction.SKAHA_SUPPLEMENTALGROUPS, "30001,30002");

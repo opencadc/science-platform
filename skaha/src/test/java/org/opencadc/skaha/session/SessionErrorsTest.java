@@ -70,6 +70,7 @@ public class SessionErrorsTest {
     public void sessionLimit() throws Exception {
         // The limit counts the user's live interactive sessions, including one launched a moment ago.
         this.requests.maxUserSessions = 1;
+        this.api.clusterQueue("cq", "default");
         this.requests.post(launch("notebook"));
         final IllegalArgumentException limit =
                 Assert.assertThrows(IllegalArgumentException.class, () -> this.requests.post(launch("carta")));

@@ -69,22 +69,18 @@
 package org.opencadc.skaha.session;
 
 import ca.nrc.cadc.rest.InitAction;
-import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
-import org.opencadc.skaha.SkahaAction;
 import org.opencadc.skaha.SkahaKubernetesClient;
 
 /**
- * One-time initialization action for Skaha. Builds the Kubernetes clients and verifies the existence of the local
- * queues, if specified.
+ * One-time initialization action for Skaha. Rejects an unusable launch route, then builds the Kubernetes clients and
+ * starts the session Job cache.
  */
 public class InitializationAction extends InitAction {
     private static final Logger LOGGER = LogManager.getLogger(InitializationAction.class);
@@ -92,27 +88,14 @@ public class InitializationAction extends InitAction {
 
     private SessionJobCache sessionJobCache;
 
-    private static final String FATAL_LOG_MESSAGE =
-            "Queue %s specified in configuration but no local queues exist in namespace %s";
-
-    private static QueueConfiguration[] getQueueConfigurations() {
-        return SkahaAction.SESSION_TYPES.stream()
-                .map(QueueConfiguration::fromType)
-                .filter(Objects::nonNull)
-                .toArray(QueueConfiguration[]::new);
-    }
-
     @Override
     public void doInit() {
+        LaunchRouter.fromEnv();
         LOGGER.info("Initializing Kubernetes API client...");
         SkahaKubernetesClient.initialize(getWorkloadNamespace());
         LOGGER.info("Initializing Kubernetes API client: OK");
 
         startSessionJobCache(CACHE_SYNC_WAIT);
-
-        LOGGER.info("Verifying QueueConfigurations, if any...");
-        ensureLocalQueuesValid(InitializationAction.getQueueConfigurations());
-        LOGGER.info("Verifying QueueConfigurations: OK");
     }
 
     @Override
@@ -145,42 +128,6 @@ public class InitializationAction extends InitAction {
         } catch (ExecutionException executionException) {
             LOGGER.error("Session Job cache failed to start; reading sessions live", executionException.getCause());
         }
-    }
-
-    void ensureLocalQueuesValid(final QueueConfiguration[] queueConfigurations) {
-        Arrays.stream(queueConfigurations).forEach(this::ensureLocalQueueValid);
-    }
-
-    private void ensureLocalQueueValid(final QueueConfiguration queueConfiguration) {
-        LOGGER.info("Checking queue {}", queueConfiguration.queueName);
-        final boolean localQueueMissing = localQueueMissing(queueConfiguration);
-        if (localQueueMissing) {
-            final String message = String.format(
-                    InitializationAction.FATAL_LOG_MESSAGE, queueConfiguration.queueName, getWorkloadNamespace());
-            LOGGER.fatal(message);
-            throw new IllegalStateException(message);
-        }
-        LOGGER.info("Checking queue {}: OK", queueConfiguration.queueName);
-    }
-
-    /**
-     * Read the configured LocalQueue in the workload namespace.
-     *
-     * @return true if the local queue does not exist, false otherwise. Any other API error (e.g. a missing permission)
-     *     fails startup.
-     */
-    boolean localQueueMissing(final QueueConfiguration queueConfiguration) {
-        return SkahaKubernetesClient.get()
-                        .genericKubernetesResources(new ResourceDefinitionContext.Builder()
-                                .withGroup(QueueConfiguration.getKueueApiGroup())
-                                .withVersion(QueueConfiguration.getKueueApiVersion())
-                                .withKind("LocalQueue")
-                                .withPlural(QueueConfiguration.KUEUE_API_PLURAL)
-                                .withNamespaced(true)
-                                .build())
-                        .withName(queueConfiguration.queueName)
-                        .get()
-                == null;
     }
 
     String getWorkloadNamespace() {

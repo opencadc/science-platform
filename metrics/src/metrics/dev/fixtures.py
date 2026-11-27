@@ -97,9 +97,15 @@ def validate_fixture_metadata(topology: Path, workloads: Path) -> None:
             if owner != FIXTURE_OWNER:
                 raise stack.DevStackError(f"{context} has unexpected {FIXTURE_OWNER_LABEL}")
         if kind == "ClusterQueue":
-            cluster_communities[name] = _required_label(
+            community = _required_label(
                 metadata.get("labels"), COMMUNITY_LABEL, context=f"ClusterQueue {name}"
             )
+            if community in cluster_communities.values():
+                raise stack.DevStackError(
+                    f"ClusterQueue {name} reuses community {community!r}; "
+                    "Metrics requires one ClusterQueue per community"
+                )
+            cluster_communities[name] = community
 
     configured = set(stack.CLUSTER_QUEUES)
     if set(cluster_communities) != configured:

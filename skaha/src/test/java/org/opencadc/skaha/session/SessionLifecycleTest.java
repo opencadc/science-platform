@@ -86,6 +86,7 @@ public class SessionLifecycleTest {
     public void lifecycle() throws Exception {
         final KubernetesClient client = this.api.client();
         final String kind = this.type.name().toLowerCase();
+        this.api.clusterQueue("cq", "default");
 
         // Launch a private image: the pull Secret is applied, then the Job, then the Service and Traefik resources it
         // owns.
@@ -119,6 +120,8 @@ public class SessionLifecycleTest {
         final Job job = onlyJob(client, sessionID);
         Assert.assertEquals(kind, job.getMetadata().getLabels().get("canfar.net/kind"));
         Assert.assertEquals(USER, job.getMetadata().getLabels().get("canfar.net/username"));
+        Assert.assertEquals("alice-default-lq", SessionLabels.queueName(job));
+        Assert.assertEquals(Boolean.TRUE, job.getSpec().getSuspend());
         final var container =
                 job.getSpec().getTemplate().getSpec().getContainers().get(0);
         Assert.assertEquals(SessionFixtures.image(kind), container.getImage());

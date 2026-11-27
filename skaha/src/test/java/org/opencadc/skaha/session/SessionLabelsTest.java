@@ -30,10 +30,12 @@ public class SessionLabelsTest {
         Assert.assertEquals("canfar", labels.get("app.kubernetes.io/part-of"));
         Assert.assertFalse(labels.containsKey("canfar.net/app-id"));
 
-        final Map<String, String> kueueLabels = SessionLabels.kueue("alice-default", "interactive-high");
-
-        Assert.assertEquals("alice-default", kueueLabels.get("kueue.x-k8s.io/queue-name"));
-        Assert.assertEquals("interactive-high", kueueLabels.get("kueue.x-k8s.io/priority-class"));
+        Assert.assertEquals(
+                Map.of("kueue.x-k8s.io/queue-name", "alice-default-lq", "kueue.x-k8s.io/priority-class", "high"),
+                SessionLabels.kueue(new LaunchAssignment("ns", "alice", "default", "cq", "high")));
+        Assert.assertEquals(
+                Map.of("kueue.x-k8s.io/queue-name", "alice-default-lq"),
+                SessionLabels.kueue(new LaunchAssignment("ns", "alice", "default", "cq", null)));
     }
 
     @Test

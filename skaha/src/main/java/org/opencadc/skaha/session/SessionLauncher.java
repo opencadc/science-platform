@@ -1,5 +1,6 @@
 package org.opencadc.skaha.session;
 
+import ca.nrc.cadc.net.ResourceNotFoundException;
 import ca.nrc.cadc.net.TransientException;
 import io.fabric8.kubernetes.api.model.DeletionPropagation;
 import io.fabric8.kubernetes.api.model.HasMetadata;
@@ -16,8 +17,8 @@ import java.util.Objects;
 import org.apache.log4j.Logger;
 
 /**
- * Creates a session Job, then the resources it owns. Either everything exists afterwards, or the Job is deleted and the
- * launch fails: a session ID is never returned for a launch that cannot run.
+ * Ensures the launch's LocalQueue, then creates a session Job and the resources it owns. Either everything exists
+ * afterwards, or the Job is deleted and the launch fails: a session ID is never returned for a launch that cannot run.
  *
  * <p>When a create's outcome is uncertain (no response, 429, 5xx) the Job is read back and, if absent, created once
  * more. That is safe because the Job name holds the request's random session ID: a 409 can only be this launch's own
@@ -30,23 +31,35 @@ class SessionLauncher {
     static final int MAX_CREATE_ATTEMPTS = 2;
 
     private final KubernetesClient client;
+    private final LocalQueues localQueues;
 
     SessionLauncher(final KubernetesClient client) {
         this.client = client;
+        this.localQueues = new LocalQueues(client);
     }
 
     /**
-     * Create the Job, then each owned resource.
+     * Ensure the assignment's LocalQueue, then create the Job and each owned resource.
      *
-     * @param labels The launch's labels, applied to each owned resource; a Service also selects by them.
+     * @param launch The Job, its labels (applied to each owned resource; a Service also selects by them), and the
+     *     assignment the Job must already be stamped with.
      * @param ownedResourceYamls Rendered Service and ingress documents; {@code ${skaha.jobuid}} and
      *     {@code ${skaha.jobname}} are filled from the created Job.
      * @return The created Job.
-     * @throws TransientException If the outcome was uncertain or an owned resource failed; nothing is left behind.
-     * @throws IllegalStateException If the cluster rejected the Job; retrying will not help.
+     * @throws TransientException If the LocalQueue is unusable, the outcome was uncertain, or an owned resource failed;
+     *     no Job is left behind.
+     * @throws ResourceNotFoundException If the assignment's ClusterQueue does not exist.
+     * @throws IllegalStateException If the Job does not carry its assignment, or the cluster rejected it.
      */
-    Job launch(final Job job, final SessionLabelPlan labels, final List<String> ownedResourceYamls)
-            throws TransientException {
+    Job launch(final SessionJobBuilder.LaunchArtifacts launch, final List<String> ownedResourceYamls)
+            throws TransientException, ResourceNotFoundException {
+        final Job job = launch.job();
+        final SessionLabelPlan labels = launch.labels();
+        if (!launch.assignment().localQueue().equals(SessionLabels.queueName(job))
+                || !Boolean.TRUE.equals(job.getSpec().getSuspend())) {
+            throw new IllegalStateException("Session Job is not stamped with its LocalQueue and suspended");
+        }
+        this.localQueues.ensure(launch.assignment());
         final Job created = createJob(job);
         try {
             for (final String ownedResourceYaml : ownedResourceYamls) {

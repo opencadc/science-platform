@@ -257,7 +257,7 @@ metadata:
       canfar.net/job: fair-warm-high
       canfar.net/flavor: fixed
       canfar.net/accelerator: none
-      canfar.net/community: astronomy
+      canfar.net/community: fairshare
       canfar.net/project: usage-fixtures
     kueue.x-k8s.io/queue-name: lq-fair-high
 spec:
@@ -310,7 +310,7 @@ metadata:
       canfar.net/job: fair-next-high
       canfar.net/flavor: fixed
       canfar.net/accelerator: none
-      canfar.net/community: astronomy
+      canfar.net/community: fairshare
       canfar.net/project: usage-fixtures
     kueue.x-k8s.io/queue-name: lq-fair-high
 spec:
@@ -363,7 +363,7 @@ metadata:
       canfar.net/job: fair-next-low
       canfar.net/flavor: fixed
       canfar.net/accelerator: none
-      canfar.net/community: astronomy
+      canfar.net/community: fairshare
       canfar.net/project: usage-fixtures
     kueue.x-k8s.io/queue-name: lq-fair-low
 spec:

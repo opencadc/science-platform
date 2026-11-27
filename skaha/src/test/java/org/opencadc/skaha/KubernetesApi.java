@@ -1,10 +1,12 @@
 package org.opencadc.skaha;
 
 import io.fabric8.kubernetes.api.model.APIResourceListBuilder;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
+import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext;
 import io.fabric8.kubernetes.client.server.mock.KubernetesMixedDispatcher;
 import io.fabric8.kubernetes.client.server.mock.KubernetesMockServer;
 import io.fabric8.mockwebserver.Context;
@@ -88,6 +90,27 @@ public class KubernetesApi extends ExternalResource {
 
     public KubernetesMockServer server() {
         return this.server;
+    }
+
+    /** Store a Kueue ClusterQueue labelled with the Community it serves. */
+    public void clusterQueue(final String name, final String community) {
+        this.client
+                .genericKubernetesResources(new ResourceDefinitionContext.Builder()
+                        .withGroup("kueue.x-k8s.io")
+                        .withVersion("v1beta2")
+                        .withKind("ClusterQueue")
+                        .withPlural("clusterqueues")
+                        .withNamespaced(false)
+                        .build())
+                .resource(new GenericKubernetesResourceBuilder()
+                        .withApiVersion("kueue.x-k8s.io/v1beta2")
+                        .withKind("ClusterQueue")
+                        .withNewMetadata()
+                        .withName(name)
+                        .addToLabels("canfar.net/community", community)
+                        .endMetadata()
+                        .build())
+                .create();
     }
 
     /** Every request received so far, as "METHOD path". */

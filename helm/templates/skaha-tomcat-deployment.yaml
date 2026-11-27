@@ -127,11 +127,13 @@ spec:
         - name: SKAHA_WORKER_NODE_LABEL_SELECTOR
           value: "{{ . }}"
         {{- end }}
+        - name: SKAHA_DEFAULT_COMMUNITY
+          value: {{ include "skaha.defaultCommunity" . | quote }}
+        - name: SKAHA_DEFAULT_CLUSTER_QUEUE
+          value: {{ include "skaha.defaultClusterQueue" . | quote }}
         {{- with .Values.deployment.skaha.sessions.kueue }}
         {{- range $queueConfigKey, $queueConfig := . }}
-        {{- if and (ne $queueConfigKey "rbac") (ne $queueConfigKey "api") }}
-        - name: SKAHA_QUEUE_{{ $queueConfigKey | upper }}_NAME
-          value: "{{ $queueConfig.queueName | required (printf "Missing .Values.deployment.skaha.sessions.kueue.%s.queueName" $queueConfigKey) }}"
+        {{- if ne $queueConfigKey "api" }}
         - name: SKAHA_QUEUE_{{ $queueConfigKey | upper }}_PRIORITY_CLASS
           value: "{{ $queueConfig.priorityClass | required (printf "Missing .Values.deployment.skaha.sessions.kueue.%s.priorityClass" $queueConfigKey) }}"
         {{- end }}

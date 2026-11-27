@@ -61,6 +61,10 @@ def validate_shared_identity():
         'metrics.env.METRICS_PROVIDERS__KUEUE__NAMESPACES=["cache-lifecycle"]',
         "--set",
         "deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://example.org~cavern",
+        "--set",
+        "deployment.skaha.sessions.communities.cadc.default=true",
+        "--set",
+        "deployment.skaha.sessions.communities.cadc.clusterQueue=cq-test",
     ]
     cases = [
         ("default", [], RELEASE, 1),

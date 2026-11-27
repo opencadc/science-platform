@@ -70,9 +70,6 @@ package org.opencadc.skaha.session;
 
 import static org.opencadc.skaha.KubernetesApi.NAMESPACE;
 
-import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
-import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
-import io.fabric8.kubernetes.client.KubernetesClientException;
 import java.time.Duration;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -81,53 +78,8 @@ import org.opencadc.skaha.KubernetesApi;
 import org.opencadc.skaha.SkahaKubernetesClient;
 
 public class InitializationActionTest {
-    private static final String LOCAL_QUEUE_PATH =
-            "/apis/kueue.x-k8s.io/v1beta2/namespaces/" + NAMESPACE + "/localqueues/test-queue";
-    private static final QueueConfiguration[] QUEUES =
-            new QueueConfiguration[] {new QueueConfiguration("notebook", "test-priority", "test-queue")};
-
     @Rule
     public final KubernetesApi api = new KubernetesApi();
-
-    /** Startup checks each configured LocalQueue: present passes, missing or any other API error fails startup. */
-    @Test
-    public void testLocalQueueCheck() {
-        final GenericKubernetesResource localQueue = new GenericKubernetesResourceBuilder()
-                .withApiVersion("kueue.x-k8s.io/v1beta2")
-                .withKind("LocalQueue")
-                .withNewMetadata()
-                .withName("test-queue")
-                .withNamespace(NAMESPACE)
-                .endMetadata()
-                .build();
-        expectLocalQueue(200, localQueue);
-        testSubject().ensureLocalQueuesValid(QUEUES);
-
-        expectLocalQueue(404, "");
-        final IllegalStateException missing = Assert.assertThrows(
-                IllegalStateException.class, () -> testSubject().ensureLocalQueuesValid(QUEUES));
-        Assert.assertTrue(missing.getMessage(), missing.getMessage().contains("test-queue"));
-
-        expectLocalQueue(403, "");
-        Assert.assertThrows(KubernetesClientException.class, () -> testSubject().ensureLocalQueuesValid(QUEUES));
-
-        final int requests = this.api.server().getRequestCount();
-        testSubject().ensureLocalQueuesValid(new QueueConfiguration[0]);
-        Assert.assertEquals(
-                "No queues configured: nothing to check",
-                requests,
-                this.api.server().getRequestCount());
-    }
-
-    private void expectLocalQueue(final int code, final Object body) {
-        this.api
-                .server()
-                .expect()
-                .get()
-                .withPath(LOCAL_QUEUE_PATH)
-                .andReturn(code, body)
-                .once();
-    }
 
     @Test
     public void testCacheStartFailureDoesNotStopStartup() {

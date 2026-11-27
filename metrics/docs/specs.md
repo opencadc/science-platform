@@ -325,32 +325,38 @@ the complete Platform boundary:
 METRICS_PROVIDERS__KUEUE__CLUSTER_QUEUES='["cq-astronomy","cq-physics"]'
 ```
 
-Each configured ClusterQueue carries one `canfar.net/community` label. A
-missing, forbidden, or malformed configured ClusterQueue fails the read;
-Platform never becomes a partial sum.
+Each configured ClusterQueue carries one `canfar.net/community` label, and
+no two configured ClusterQueues share it. A missing, forbidden, or malformed
+configured ClusterQueue fails the read. Two configured ClusterQueues that
+share a community label fail Platform reads and startup. Platform never
+becomes a partial sum.
 
 ### User
 
 Metrics lists LocalQueues labelled exactly `canfar.net/username=<user>` in
-every configured namespace, reading ClusterQueues at the same time. Every
-matching LocalQueue must:
+every configured namespace. The User path does not read ClusterQueues.
+Duplicate community labels on ClusterQueues fail Platform, Community, and
+startup instead.
 
-- be returned from the namespace that was queried;
-- reference a configured ClusterQueue;
-- carry a `canfar.net/community` equal to that ClusterQueue's label; and
-- have a distinct `(namespace, name)` and, when present, UID.
+Every matching LocalQueue must:
 
-Any matching LocalQueue that fails a check fails the User read (a 503 when no
-snapshot exists); it is never silently dropped. The report sums
-`status.flavorsReservation[].resources[].total` into `requests` and
-`reservingWorkloads` into the count. No match is a 404.
+- come from the namespace that was queried
+- name a configured ClusterQueue in `spec.clusterQueue`
+- carry a nonempty `canfar.net/community` label
+- have a distinct `(namespace, name)` and, when present, a distinct UID
+
+If any matching LocalQueue fails a check, the User read fails. When no cache
+snapshot exists, that failure is a 503. Metrics never drops a matching queue
+from the total. The report sums `status.flavorsReservation[].resources[].total`
+into `requests` and `reservingWorkloads` into the count. No match is a 404.
 
 ### Community
 
-Metrics filters the configured ClusterQueues by
-`canfar.net/community=<community>` and sums their
-`flavorsReservation` totals and `reservingWorkloads`. No match is a 404.
-Community membership is not derived from LocalQueues or Cohorts.
+Metrics reads the one configured ClusterQueue labelled
+`canfar.net/community=<community>` and reports its `flavorsReservation`
+totals and `reservingWorkloads`. No match is a 404. A repeated community
+label in the configured set fails the read. Community membership is not
+derived from LocalQueues or Cohorts.
 
 ### Session
 
