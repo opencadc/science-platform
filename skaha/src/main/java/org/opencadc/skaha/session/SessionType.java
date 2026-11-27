@@ -10,7 +10,8 @@ public enum SessionType {
     NOTEBOOK(true, true, "notebook"),
     HEADLESS(false, false, "headless"),
     DESKTOP_APP(false, false, "desktop-app"),
-    FIREFLY(true, true, "firefly");
+    FIREFLY(true, true, "firefly"),
+    BATCH(false, false, "batch");
 
     private final boolean supportsIngress;
     private final boolean supportsService;
@@ -50,6 +51,14 @@ public enum SessionType {
                 K8SUtil.getWorkingDirectory(), this.name().toLowerCase()));
     }
 
+    /**
+     * The Job name. A batch's Pod names add the index and five characters to it; leaving out the user keeps them within
+     * 63.
+     */
+    public String jobName(final String sessionID, final String userID) {
+        return this == BATCH ? ("batch-" + sessionID).toLowerCase() : K8SUtil.getJobName(sessionID, this, userID);
+    }
+
     public Path getJobConfigPath() {
         return Path.of(String.format(
                 "%s/config/launch-%s.yaml",
@@ -66,6 +75,15 @@ public enum SessionType {
 
     public boolean isHeadless() {
         return this == HEADLESS;
+    }
+
+    /**
+     * False for the kinds that run unattended from a command line (headless and batch). They take {@code cmd},
+     * {@code args} and {@code env}, do not count toward the interactive session cap, and the interactive listing leaves
+     * them out.
+     */
+    public boolean isInteractive() {
+        return this != HEADLESS && this != BATCH;
     }
 
     public boolean isDesktop() {

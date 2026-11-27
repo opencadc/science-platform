@@ -11,6 +11,13 @@ Amended: each Community is exactly one configured ClusterQueue. A repeated
 `canfar.net/community` label on the configured set is invalid. User reports
 read LocalQueues only and do not GET ClusterQueues on that path.
 
+Amended: a Session Job holds its effective pod request times the pods it can
+still run at once, `min(parallelism, completions - succeeded)`; Kueue keeps
+holding a failed index. A Job
+labelled `canfar.net/kind=batch` also reports `total`, its pod request times
+`completions`, and keeps its resources listed while it is suspended or
+finished.
+
 ## Decision
 
 Metrics is one asynchronous FastAPI service. It uses one shared external Redis
@@ -32,8 +39,10 @@ desktop-app children that share the id.
 Public aggregation uses `flavorsReservation` and `reservingWorkloads` for User
 and Community. Platform uses nominal quota and `flavorsUsage` for capacity and
 allocation. Session uses active Jobs only (not `Complete`, not `Failed`, not
-suspended) and each Job's effective pod request as Kubernetes and Kueue compute
-it. A finished session reports nothing reserved.
+suspended) and what each Job holds: its effective pod request, as Kubernetes
+and Kueue compute it, times the pods it can still run at once. A finished
+session reports nothing reserved. A batch session also reports the total of
+its whole run at every stage.
 
 Optional instant PromQL efficiency covers User, Community, and Platform.
 Session may add optional `metrics.k8s.io` usage and duration PromQL efficiency.

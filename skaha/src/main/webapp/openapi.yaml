@@ -121,32 +121,56 @@ paths:
         - name: cmd
           in: query
           description: >
-            Only applies to session type 'headless'. Override the image
-            entrypoint with this command.
+            Only applies to session types 'headless' and 'batch'. Override the
+            image entrypoint with this command.
           required: false
           schema:
             type: string
         - name: args
           in: query
           description: >
-            Only applies to session type 'headless'. Override the image CMD
-            params with these values. Multiple arguments are separated with a
-            space. The value must be URL encoded. For example, "args=arg1 arg2"
-            is represented as "args=arg1%20arg2".
+            Only applies to session types 'headless' and 'batch'. Override the
+            image CMD params with these values. Multiple arguments are separated
+            with a space. The value must be URL encoded. For example, "args=arg1
+            arg2" is represented as "args=arg1%20arg2".
           required: false
           schema:
             type: string
         - name: env
           in: query
           description: >
-            Only applies to session type 'headless'. Add additional environment
-            to the container. Format is key=value. Multiple env parameters
-            supported. 'key=value' must be URL encoded, so, for example,
-            PATH=/usr/local/bin should be supplied as
-            PATH%3D%2Fusr%2Flocal%2Fbin.
+            Only applies to session types 'headless' and 'batch'. Add additional
+            environment to the container. Format is key=value. Multiple env
+            parameters supported. 'key=value' must be URL encoded, so, for
+            example, PATH=/usr/local/bin should be supplied as
+            PATH%3D%2Fusr%2Flocal%2Fbin. A name that starts with CANFAR_ is
+            rejected for every session type: the platform sets
+            CANFAR_SESSION_KIND, CANFAR_SESSION_ID and CANFAR_USERNAME, and
+            CANFAR_REPLICA_INDEX and CANFAR_REPLICA_COUNT on a batch.
           required: false
           schema:
             type: string
+        - name: replicas
+          in: query
+          description: >
+            With type 'batch', the number of indexed replicas to run, 1 to 256.
+            One session id is returned. Any other type accepts only 1.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 256
+            default: 1
+        - name: maxfail
+          in: query
+          description: >
+            Only applies to type 'batch'. The failed fraction of replicas, 0 to
+            1, that stops the batch. Omit it to run every replica.
+          required: false
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
         - name: x-skaha-registry-auth
           in: header
           description: >
@@ -182,18 +206,24 @@ paths:
   "/v1/session/{sessionID}":
     get:
       description: >
-        Get the session identified by sessionID as a JSON object.
+        Get the session identified by sessionID as a JSON object.  A batch
+        returns its Batch document (apiVersion canfar.net/v1alpha1, kind Batch)
+        with one status.replicas row per replica.  Errors of batch requests
+        (type=batch or maxfail sent, or a batch session) are a JSON
+        Status document with reason BadRequest, NotFound or ServiceUnavailable.
       tags:
         - Session Management
       responses:
         "200":
           description: Successful response
+        "400":
+          description: A batch log without a valid replica, or replica sent for a session that is not a batch
         "401":
           description: Not authenticated
         "403":
           description: Permission denied
         "404":
-          description: Not found
+          description: Not found, or the batch replica has no Pod
         "500":
           description: Internal error
         "503":
@@ -215,6 +245,14 @@ paths:
           required: false
           schema:
             type: string
+        - name: replica
+          in: query
+          description: With view=logs, required for a batch and refused otherwise. The
+            replica index, 0 to replicas - 1; the log is that replica's newest Pod.
+          required: false
+          schema:
+            type: integer
+            minimum: 0
     post:
       description: >
         Applies an action to the session identified by sessionID.  This applies

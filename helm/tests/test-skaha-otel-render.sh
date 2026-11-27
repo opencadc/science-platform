@@ -201,6 +201,23 @@ assert_env_value "${queue_render}" "SKAHA_QUEUE_DEFAULT_PRIORITY_CLASS" "high"
 assert_env_value "${queue_render}" "SKAHA_QUEUE_DESKTOP-APP_PRIORITY_CLASS" "medium"
 assert_not_contains "${queue_render}" "SKAHA_QUEUE_DEFAULT_NAME"
 
+render_batch_template() {
+    helm template batch-template-test "${chart_dir}" \
+        --show-only templates/skaha-config-configmap.yaml \
+        "${metrics_required_args[@]}" \
+        --set deployment.skaha.sessions.userStorage.nodeURIPrefix=vos://storage.example.org~cavern \
+        "$@" |
+        awk '/^  launch-batch\.yaml: \|/{capture=1; next} /^  [^ ]/{capture=0} capture{print}'
+}
+
+default_batch_template="$(render_batch_template)"
+assert_contains "${default_batch_template}" 'completionMode: Indexed'
+assert_contains "${default_batch_template}" 'backoffLimitPerIndex: 0'
+assert_contains "${default_batch_template}" 'ttlSecondsAfterFinished: 86400'
+assert_contains "${default_batch_template}" 'restartPolicy: Never'
+assert_contains "${default_batch_template}" '- type: DisruptionTarget'
+assert_not_contains "${default_batch_template}" 'backoffLimit:'
+
 default_community_render="$(
     render_skaha_deployment --no-cadc \
         --set deployment.skaha.sessions.communities.default.default=true \

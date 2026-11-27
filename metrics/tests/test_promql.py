@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 import json
+import re
 from urllib.parse import parse_qs
 
 import httpx
@@ -514,6 +515,25 @@ def test_session_selectors_are_scoped_to_the_sessions_job_pods() -> None:
         for selector in query.split(metric)[1:]:
             assert selector.split("}", 1)[0].count(pods) == 1, metric
     assert "pod=~" not in query.split("kube_pod_labels")[1].split("}", 1)[0]
+
+
+def test_session_pod_matcher_selects_every_index_of_a_batch_job() -> None:
+    """Indexed pods (``<job>-<index>-<suffix>``) match their Job and no other Job."""
+    query = promql_module._session_query(
+        session_id="k7nq2wpx",
+        cluster="cluster-a",
+        namespaces=["workloads"],
+        duration_seconds=600,
+        job_names=("batch-k7nq2wpx",),
+    )
+    literal = re.search(r'pod=~("(?:[^"\\]|\\.)*")', query)
+    assert literal is not None
+    pods = re.compile(json.loads(literal.group(1)))
+
+    assert pods.fullmatch("batch-k7nq2wpx-12-x9k2p")
+    assert pods.fullmatch("batch-k7nq2wpx-255-abcde")
+    assert not pods.fullmatch("batch-k7nq2wpx2-0-abcde")
+    assert not pods.fullmatch("headless-k7nq2wpx-x9k2p")
 
 
 def test_session_window_is_at_least_one_step_and_at_most_six_hours() -> None:

@@ -17,10 +17,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import org.apache.log4j.Logger;
 import org.opencadc.skaha.K8SUtil;
 import org.opencadc.skaha.metrics.PodResourceUsage;
 import org.opencadc.skaha.metrics.ResourceQuantityFormatter;
+import org.opencadc.skaha.metrics.SessionMetrics;
 import org.opencadc.skaha.session.userStorage.UserStorageConfiguration;
 import org.opencadc.skaha.utils.CommonUtils;
 
@@ -52,10 +55,11 @@ class SessionBuilder {
     private String status;
     private String startTime;
     private String expiryTime;
-    private Long activeExpirySeconds;
     private String connectURL;
     private String jobName; // used to match up resource usages (metrics)
     private boolean isFixedResources;
+    private String completionTime;
+    private Batch.Progress replicas;
 
     SessionBuilder(final String id, final String userID, final String type) {
         Objects.requireNonNull(id, "Session ID cannot be null");
@@ -67,7 +71,28 @@ class SessionBuilder {
         this.type = type;
     }
 
+    /** A session with the status its Job's counters give, and the requests and usage of its Pod. */
     static Session fromJob(final Job job, final PodResourceUsage podResourceUsage) {
+        return fromJobSpec(job)
+                .withStatus(
+                        job.getStatus(),
+                        Objects.requireNonNullElse(job.getSpec().getSuspend(), false))
+                .withPodResources(job.getSpec(), podResourceUsage)
+                .build();
+    }
+
+    /**
+     * A batch's list entry: the batch phase and counters, with the held and used resources from its Metrics report.
+     *
+     * @param metrics The session's Metrics report, or null when it could not be read; the resource fields are then
+     *     empty.
+     */
+    static Session fromBatchJob(final Job job, final SessionMetrics metrics) {
+        return fromJobSpec(job).withBatch(job).withMetricsResources(metrics).build();
+    }
+
+    /** Everything but the status and resources: the labels, Pod identity, image, connect URL, start and expiry. */
+    private static SessionBuilder fromJobSpec(final Job job) {
         final ObjectMeta jobMetadata = job.getMetadata();
         Objects.requireNonNull(jobMetadata, "Invalid Job with null Metadata");
 
@@ -86,14 +111,49 @@ class SessionBuilder {
         sessionBuilder.name = SessionLabels.get(labels, SessionLabels.Key.NAME);
         sessionBuilder.isFixedResources = SessionLabels.fixedResources(labels);
         sessionBuilder.jobName = jobMetadata.getName();
-
-        return sessionBuilder
-                .withJobSpec(jobSpec, podResourceUsage)
-                .withStatus(job.getStatus(), Objects.requireNonNullElse(jobSpec.getSuspend(), false))
-                .build();
+        if (job.getStatus() != null && job.getStatus().getStartTime() != null) {
+            // ISO-8601, seconds omitted when zero (e.g. 2026-10-23T12:00Z).
+            sessionBuilder.startTime =
+                    OffsetDateTime.parse(job.getStatus().getStartTime()).toString();
+        }
+        return sessionBuilder.withJobSpec(jobSpec);
     }
 
-    SessionBuilder withJobSpec(final JobSpec jobSpec, final PodResourceUsage podResourceUsage) {
+    /** A batch's status is its phase; it adds the replica counters and when it finished. */
+    SessionBuilder withBatch(final Job job) {
+        this.status = Batch.phase(job);
+        this.replicas = Batch.Progress.of(job);
+        this.completionTime = Batch.completionTime(job);
+        return this;
+    }
+
+    /** The held and used resources from a Metrics session report; none when the report could not be read. */
+    SessionBuilder withMetricsResources(final SessionMetrics metrics) {
+        if (metrics == null) {
+            return this;
+        }
+        final SessionMetrics.Resource cpu = metrics.resource("cpu");
+        final SessionMetrics.Resource memory = metrics.resource("memory");
+        this.requestedCPUCores = format(cpu, SessionMetrics.Resource::requests, ResourceQuantityFormatter::toCoreUnit);
+        this.cpuCoresInUse = format(cpu, SessionMetrics.Resource::usage, ResourceQuantityFormatter::toCoreUnit);
+        this.requestedMemory =
+                format(memory, SessionMetrics.Resource::requests, ResourceQuantityFormatter::toSessionMemoryGb);
+        this.memoryInUse = format(memory, SessionMetrics.Resource::usage, ResourceQuantityFormatter::toSessionMemoryGb);
+        this.requestedGPUCores = Objects.requireNonNullElse(
+                format(metrics.resource("nvidia.com/gpu"), SessionMetrics.Resource::requests, UnaryOperator.identity()),
+                "0");
+        return this;
+    }
+
+    private static String format(
+            final SessionMetrics.Resource row,
+            final Function<SessionMetrics.Resource, String> field,
+            final UnaryOperator<String> formatter) {
+        final String value = row == null ? null : field.apply(row);
+        return value == null ? null : formatter.apply(value);
+    }
+
+    SessionBuilder withJobSpec(final JobSpec jobSpec) {
         Objects.requireNonNull(jobSpec, "Invalid JobSpec");
 
         final Long secondsUntilExpire = jobSpec.getActiveDeadlineSeconds();
@@ -103,8 +163,6 @@ class SessionBuilder {
             } else {
                 this.expiryTime = CommonUtils.getExpiryTimeString(this.startTime, secondsUntilExpire);
             }
-        } else {
-            this.activeExpirySeconds = secondsUntilExpire;
         }
 
         final PodSpec podSpec = jobSpec.getTemplate().getSpec();
@@ -123,51 +181,11 @@ class SessionBuilder {
                 }
             }
 
-            // The Pod Name starts with the Job Name.  Is this reliable?
-            this.memoryInUse = podResourceUsage.memory().entrySet().stream()
-                    .filter(entry -> entry.getKey().startsWith(this.jobName))
-                    .map(Map.Entry::getValue)
-                    .findFirst()
-                    .orElse(null);
-            this.cpuCoresInUse = podResourceUsage.cpu().entrySet().stream()
-                    .filter(entry -> entry.getKey().startsWith(this.jobName))
-                    .map(Map.Entry::getValue)
-                    .findFirst()
-                    .orElse(null);
-
             final List<Container> podContainers = podSpec.getContainers();
             if (podContainers.isEmpty()) {
                 SessionDAO.LOGGER.warn("No Container found.");
             } else {
-                final Container podContainer = podContainers.getFirst();
-                this.image = podContainer.getImage();
-
-                final ResourceRequirements resourceRequirements =
-                        Objects.requireNonNullElse(podContainer.getResources(), new ResourceRequirements());
-
-                final Map<String, Quantity> resourceRequests =
-                        Objects.requireNonNullElse(resourceRequirements.getRequests(), Collections.emptyMap());
-                if (this.isFixedResources) {
-                    if (resourceRequests.containsKey("memory")) {
-                        this.requestedMemory = ResourceQuantityFormatter.toSessionMemoryGb(
-                                resourceRequests.get("memory").toString());
-                    }
-
-                    if (resourceRequests.containsKey("cpu")) {
-                        this.requestedCPUCores = ResourceQuantityFormatter.toCoreUnit(
-                                resourceRequests.get("cpu").toString());
-                    }
-                }
-
-                final Map<String, Quantity> resourceLimits =
-                        Objects.requireNonNullElse(resourceRequirements.getLimits(), Collections.emptyMap());
-                if (resourceLimits.containsKey("nvidia.com/gpu")) {
-                    this.requestedGPUCores =
-                            resourceLimits.get("nvidia.com/gpu").toString();
-                } else {
-                    // Set to zero to satisfy UI conditions.
-                    this.requestedGPUCores = "0";
-                }
+                this.image = podContainers.getFirst().getImage();
             }
 
             try {
@@ -181,6 +199,57 @@ class SessionBuilder {
                 SessionDAO.LOGGER.warn("Invalid URI for connect URL: " + this);
                 throw new IllegalStateException(e.getMessage(), e);
             }
+        }
+
+        return this;
+    }
+
+    /** The requests of the session's container, and the usage of its Pod, whose name starts with the Job name. */
+    SessionBuilder withPodResources(final JobSpec jobSpec, final PodResourceUsage podResourceUsage) {
+        final PodSpec podSpec = jobSpec.getTemplate().getSpec();
+        if (podSpec == null) {
+            return this;
+        }
+
+        // The Pod Name starts with the Job Name.  Is this reliable?
+        this.memoryInUse = podResourceUsage.memory().entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith(this.jobName))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
+        this.cpuCoresInUse = podResourceUsage.cpu().entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith(this.jobName))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
+
+        if (podSpec.getContainers().isEmpty()) {
+            return this;
+        }
+        final ResourceRequirements resourceRequirements = Objects.requireNonNullElse(
+                podSpec.getContainers().getFirst().getResources(), new ResourceRequirements());
+
+        final Map<String, Quantity> resourceRequests =
+                Objects.requireNonNullElse(resourceRequirements.getRequests(), Collections.emptyMap());
+        if (this.isFixedResources) {
+            if (resourceRequests.containsKey("memory")) {
+                this.requestedMemory = ResourceQuantityFormatter.toSessionMemoryGb(
+                        resourceRequests.get("memory").toString());
+            }
+
+            if (resourceRequests.containsKey("cpu")) {
+                this.requestedCPUCores = ResourceQuantityFormatter.toCoreUnit(
+                        resourceRequests.get("cpu").toString());
+            }
+        }
+
+        final Map<String, Quantity> resourceLimits =
+                Objects.requireNonNullElse(resourceRequirements.getLimits(), Collections.emptyMap());
+        if (resourceLimits.containsKey("nvidia.com/gpu")) {
+            this.requestedGPUCores = resourceLimits.get("nvidia.com/gpu").toString();
+        } else {
+            // Set to zero to satisfy UI conditions.
+            this.requestedGPUCores = "0";
         }
 
         return this;
@@ -217,15 +286,6 @@ class SessionBuilder {
             LOGGER.debug("No JobStatus found for " + this.id);
             this.status = Session.STATUS_PENDING;
         } else {
-            if (jobStatus.getStartTime() != null) {
-                // ISO-8601, seconds omitted when zero (e.g. 2026-10-23T12:00Z).
-                this.startTime = OffsetDateTime.parse(jobStatus.getStartTime()).toString();
-            }
-
-            if (this.activeExpirySeconds != null && this.startTime != null) {
-                this.expiryTime = CommonUtils.getExpiryTimeString(this.startTime, this.activeExpirySeconds);
-            }
-
             final int success = Objects.requireNonNullElse(jobStatus.getSucceeded(), 0);
             final int failed = Objects.requireNonNullElse(jobStatus.getFailed(), 0);
             final int active = Objects.requireNonNullElse(jobStatus.getActive(), 0);
@@ -286,6 +346,8 @@ class SessionBuilder {
         session.setCPUCoresInUse(this.cpuCoresInUse);
         session.setRAMInUse(this.memoryInUse);
         session.setFixedResources(this.isFixedResources);
+        session.setCompletionTime(this.completionTime);
+        session.setReplicas(this.replicas);
 
         return session;
     }
@@ -305,8 +367,7 @@ class SessionBuilder {
                 + cpuCoresInUse + '\'' + ", status='"
                 + status + '\'' + ", startTime='"
                 + startTime + '\'' + ", expiryTime='"
-                + expiryTime + '\'' + ", activeExpirySeconds="
-                + activeExpirySeconds + ", connectURL='"
+                + expiryTime + '\'' + ", connectURL='"
                 + connectURL + '\'' + ", jobName='"
                 + jobName + '\'' + '}';
     }

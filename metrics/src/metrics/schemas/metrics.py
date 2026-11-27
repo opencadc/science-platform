@@ -55,6 +55,7 @@ class ResourceMetrics(WireModel):
     name: str = Field(min_length=1)
     capacity: str | None = None
     allocated: str | None = None
+    total: str | None = None
     requests: str | None = None
     usage: str | None = None
     efficiency: str | None = None
@@ -68,7 +69,7 @@ class ResourceMetrics(WireModel):
         name = values.get("name")
         if not isinstance(name, str):
             return values
-        for field_name in ("capacity", "allocated", "requests", "usage", "efficiency"):
+        for field_name in ("capacity", "allocated", "total", "requests", "usage", "efficiency"):
             value = values.get(field_name)
             if value is not None:
                 if field_name == "efficiency" and name not in MEASURED_RESOURCES:
@@ -214,6 +215,8 @@ class Metrics(WireModel):
                 raise ValueError("spec subject does not match resource surface")
             if resource.usage is not None and not is_session:
                 raise ValueError("usage is supported only for session reports")
+            if resource.total is not None and not is_session:
+                raise ValueError("total is supported only for session reports")
         if is_platform and not self.status.resources:
             raise ValueError("platform status must contain resources")
         return self

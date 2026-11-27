@@ -44,8 +44,10 @@ local lifecycle documented in [`docs/dev-setup.md`](docs/dev-setup.md).
   namespaces, including desktop-app children that share the id.
 - `flavorsReservation` is the source for public User/Community request totals;
   `reservingWorkloads` is the public workload count. For Session, requests are
-  the effective pod requests of active Jobs (not `Complete`, `Failed`, or
-  suspended) and the count is the active Job count.
+  what active Jobs (not `Complete`, `Failed`, or suspended) hold now: the
+  effective pod request times `min(parallelism, completions - succeeded)`; a
+  failed index stays held. The count is the active Job count. A `canfar.net/kind=batch` Job
+  also reports `total` (pod request times `completions`) at every stage.
 - Snapshots have two stages, fresh and stale, fixed per surface in
   `FRESHNESS_POLICIES`. A stale snapshot is served while exactly one request
   across all replicas refreshes it; do not add a retained stage, a periodic

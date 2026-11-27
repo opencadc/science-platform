@@ -78,7 +78,8 @@ final class SessionJobCache implements AutoCloseable {
         this.recentlyCreated.put(job.getMetadata().getName(), new RecentJob(job, this.clock.instant()));
     }
 
-    List<Job> userJobs(final String username, final boolean omitHeadless) {
+    /** The user's session Jobs; with {@code interactiveOnly}, those {@link SessionLabels#interactive} keeps. */
+    List<Job> userJobs(final String username, final boolean interactiveOnly) {
         final Instant expiry = this.clock.instant().minus(RECENT_CREATE_WINDOW);
         this.recentlyCreated.values().removeIf(recent -> recent.createdAt().isBefore(expiry));
 
@@ -92,8 +93,7 @@ final class SessionJobCache implements AutoCloseable {
                 .forEach(jobs::add);
 
         return jobs.stream()
-                .filter(job -> !omitHeadless
-                        || !SessionAction.SESSION_TYPE_HEADLESS.equals(SessionLabels.get(job, SessionLabels.Key.KIND)))
+                .filter(job -> !interactiveOnly || SessionLabels.interactive(job))
                 .toList();
     }
 

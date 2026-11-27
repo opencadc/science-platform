@@ -6,9 +6,10 @@ import org.junit.Test;
 public class PodMetricsDAOTest {
 
     @Test
-    public void buildLabelSelectorForUserAndOmitHeadless() {
+    public void buildLabelSelectorForUserAndInteractiveOnly() {
         Assert.assertEquals(
-                "canfar.net/username=alice,canfar.net/kind!=headless", PodMetricsDAO.buildLabelSelector("alice", true));
+                "canfar.net/username=alice,canfar.net/kind!=headless,canfar.net/kind!=batch",
+                PodMetricsDAO.buildLabelSelector("alice", true));
     }
 
     @Test

@@ -11,8 +11,8 @@ contract is under [Metrics integration boundary](#metrics-integration-boundary).
 | `canfar.net/id` | session id | Always | Required |
 | `canfar.net/username` | user id | Always | Required |
 | `canfar.net/name` | session name | Always | Required; truncated to ≤63 chars if needed for Kubernetes label syntax |
-| `canfar.net/kind` | session type (`notebook`, `carta`, `desktop`, `headless`, `desktop-app`, `firefly`, …) | Always | Required |
-| `canfar.net/job` | Job name | Always | Required |
+| `canfar.net/kind` | session type (`notebook`, `carta`, `desktop`, `headless`, `batch`, `desktop-app`, `firefly`, …) | Always | Required. `view=interactive` and the interactive session cap leave out `headless` and `batch` |
+| `canfar.net/job` | Job name | Always | Required. A batch Job is `batch-<id>` |
 | `canfar.net/flavor` | `fixed` \| `flexible` | Always | `fixed` when memory request equals memory limit; otherwise `flexible` |
 | `canfar.net/accelerator` | `gpu` \| `none` | Always | `gpu` when GPU count > 0; otherwise `none` |
 | `canfar.net/community` | Community name | Always | Helm communities map key of the entry with `default: true` |
@@ -34,6 +34,34 @@ contract is under [Metrics integration boundary](#metrics-integration-boundary).
 | Service selector | Only `canfar.net/id` and `canfar.net/kind` |
 | Ingress metadata | Same as Service metadata |
 
+A batch has no Service and no Ingress. The Job controller adds
+`batch.kubernetes.io/job-completion-index` to each batch Pod; Skaha reads it to
+find a replica's Pod for its row in the Batch document and for
+`view=logs&replica=<n>`.
+
+## Batch annotations
+
+Skaha writes these annotations on a batch Job, not labels:
+
+| Annotation | Value | When set |
+|------------|-------|----------|
+| `kueue.x-k8s.io/job-min-parallelism` | `"1"` | `replicas` above 1. Kueue may then admit fewer Pods than `parallelism` |
+| `canfar.net/maxfail` | the request's `maxfail`, e.g. `0.25` | `maxfail` sent. The Batch document reads `spec.maxfail` back from it, because `maxFailedIndexes` is rounded |
+
+## Container environment
+
+Skaha sets these variables on every session app container, after the request's
+`env`, from the same values as the labels. A request `env` name that starts with
+`CANFAR_` (any case) is rejected with 400.
+
+| Variable | Value | Sessions |
+|----------|-------|----------|
+| `CANFAR_SESSION_KIND` | `canfar.net/kind` | All |
+| `CANFAR_SESSION_ID` | `canfar.net/id` | All |
+| `CANFAR_USERNAME` | `canfar.net/username` | All |
+| `CANFAR_REPLICA_INDEX` | field reference to the Pod's `batch.kubernetes.io/job-completion-index` annotation, `0` to `replicas - 1` | Batch |
+| `CANFAR_REPLICA_COUNT` | `replicas` | Batch |
+
 ## Typical full set (common session, no desktop app, version set)
 
 ```text
@@ -52,6 +80,32 @@ app.kubernetes.io/version=<SKAHA_VERSION>
 kueue.x-k8s.io/queue-name=<user>-cadc-lq   # Job only
 ```
 
+## Typical batch set
+
+A batch Job named `batch-<id>`, 50 replicas, `maxfail=0.25`:
+
+```text
+canfar.net/community=cadc
+canfar.net/project=default
+canfar.net/id=<session-id>
+canfar.net/username=<user>
+canfar.net/name=<session-name>
+canfar.net/kind=batch
+canfar.net/flavor=fixed|flexible
+canfar.net/job=batch-<session-id>
+canfar.net/accelerator=none|gpu
+app.kubernetes.io/managed-by=skaha
+app.kubernetes.io/part-of=canfar
+kueue.x-k8s.io/queue-name=<user>-cadc-lq   # Job only
+
+# Job annotations
+kueue.x-k8s.io/job-min-parallelism=1
+canfar.net/maxfail=0.25
+
+# Added by the Job controller to each Pod (label and annotation)
+batch.kubernetes.io/job-completion-index=<0..49>
+```
+
 ## Edge cases
 
 | Case | Result |
@@ -66,6 +120,8 @@ kueue.x-k8s.io/queue-name=<user>-cadc-lq   # Job only
 | Memory request ≠ limit (or unpaired) | `canfar.net/flavor=flexible` |
 | User or Community not a DNS-1123 label, or `<user>-<community>-lq` over 63 characters | Launch rejected |
 | Project omitted | `canfar.net/project=default` |
+| Batch with one replica | No `kueue.x-k8s.io/job-min-parallelism` annotation |
+| Batch without `maxfail` | No `canfar.net/maxfail` annotation |
 
 ## Metrics integration boundary
 

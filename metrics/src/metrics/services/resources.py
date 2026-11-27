@@ -155,6 +155,14 @@ def format_resource_amount(resource_name: str, value: object) -> str:
     return f"{text}Gi" if resource_name in STORAGE_RESOURCES else text
 
 
+def multiply_resource_amount(resource_name: str, value: Decimal, count: int) -> Decimal:
+    """Multiply one parsed quantity by a count exactly, keeping the product in bounds."""
+    with localcontext() as context:
+        context.prec = max(128, len(value.as_tuple().digits) + len(str(count)) + 32)
+        product = value * count
+    return _validate_resource_amount(resource_name, product)
+
+
 def merge_resource_totals(target: dict[str, Decimal], name: str, delta: Decimal) -> None:
     """Add one parsed quantity to an aggregate map, keeping the total in bounds."""
     current = target.get(name, Decimal(0))

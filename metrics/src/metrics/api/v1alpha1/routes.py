@@ -92,9 +92,11 @@ def _resources(snapshot: CachedSnapshot) -> list[ResourceMetrics]:
             for name in sorted(observation.capacity)
         ]
     usage = snapshot.usage or {}
+    totals = observation.totals if isinstance(observation, SessionObservation) else {}
     return [
         ResourceMetrics(
             name=name,
+            total=totals.get(name),
             requests=observation.requests[name],
             usage=usage.get(name),
             efficiency=_efficiency(snapshot, name),

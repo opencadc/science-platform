@@ -97,6 +97,7 @@ public class Session {
     private final String name;
     private final String startTime;
     private String expiryTime; // in seconds
+    private String completionTime; // batch only
     private final String connectURL;
     private String requestedRAM;
     private String requestedCPUCores;
@@ -106,6 +107,7 @@ public class Session {
     private String cpuCoresInUse;
     private String gpuUtilization;
     private boolean isFixedResources;
+    private Batch.Progress replicas; // batch only
 
     public Session(
             String id,
@@ -240,6 +242,14 @@ public class Session {
 
     public void setFixedResources(boolean isFixedResources) {
         this.isFixedResources = isFixedResources;
+    }
+
+    void setCompletionTime(String completionTime) {
+        this.completionTime = completionTime;
+    }
+
+    void setReplicas(Batch.Progress replicas) {
+        this.replicas = replicas;
     }
 
     public String getAppId() {

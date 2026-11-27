@@ -2,13 +2,9 @@ package org.opencadc.skaha.metrics;
 
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.api.model.batch.v1.JobBuilder;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Set;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -18,10 +14,10 @@ public class MetricsBackendPodUsageProviderTest {
     @Test
     public void getPodMetricsMapsUsageToJobNames() throws Exception {
         final SessionMetricsDAO sessionMetricsDAO = Mockito.mock(SessionMetricsDAO.class);
-        Mockito.when(sessionMetricsDAO.getSessionMetrics("session-a"))
-                .thenReturn(new SessionMetrics("session-a", Map.of("cpu", "500m", "memory", "512Mi")));
-        Mockito.when(sessionMetricsDAO.getSessionMetrics("session-b"))
-                .thenReturn(new SessionMetrics("session-b", Map.of("cpu", "250m", "memory", "256Mi")));
+        Mockito.when(sessionMetricsDAO.getSessionMetrics(Set.of("session-a", "session-b")))
+                .thenReturn(Map.of(
+                        "session-a", usage("session-a", "500m", "512Mi"),
+                        "session-b", usage("session-b", "250m", "256Mi")));
 
         final MetricsBackendPodUsageProvider provider = new MetricsBackendPodUsageProvider(sessionMetricsDAO);
         final List<Job> jobs =
@@ -44,18 +40,17 @@ public class MetricsBackendPodUsageProviderTest {
     }
 
     @Test
-    public void getPodMetricsSoftFailsPerSession() throws Exception {
+    public void getPodMetricsSkipsSessionsWithoutAReport() throws Exception {
         final SessionMetricsDAO sessionMetricsDAO = Mockito.mock(SessionMetricsDAO.class);
-        Mockito.when(sessionMetricsDAO.getSessionMetrics("session-a"))
-                .thenReturn(new SessionMetrics("session-a", Map.of("cpu", "500m")));
-        Mockito.when(sessionMetricsDAO.getSessionMetrics("session-b"))
-                .thenThrow(new RuntimeException("backend unavailable"));
+        Mockito.when(sessionMetricsDAO.getSessionMetrics(Set.of("session-a", "session-b")))
+                .thenReturn(Map.of("session-a", usage("session-a", "500m", null)));
 
         final MetricsBackendPodUsageProvider provider = new MetricsBackendPodUsageProvider(sessionMetricsDAO);
         final PodMetrics podMetrics = provider.getPodMetrics(
                 "alice", false, List.of(job("job-a-main", "session-a"), job("job-b-main", "session-b")));
 
         Assert.assertEquals("500m", podMetrics.cpuByPodName().get("job-a-main"));
+        Assert.assertFalse(podMetrics.memoryByPodName().containsKey("job-a-main"));
         Assert.assertFalse(podMetrics.cpuByPodName().containsKey("job-b-main"));
     }
 
@@ -67,79 +62,12 @@ public class MetricsBackendPodUsageProviderTest {
                 PodMetrics.empty(), provider.getPodMetrics("alice", false, List.of(job("job-a-main", "session-a"))));
     }
 
-    @Test
-    public void getPodMetricsLimitsConcurrentBackendRequests() throws Exception {
-        final AtomicInteger activeRequests = new AtomicInteger();
-        final AtomicInteger maxActiveRequests = new AtomicInteger();
-        final SessionMetricsDAO sessionMetricsDAO = Mockito.mock(SessionMetricsDAO.class);
-        Mockito.when(sessionMetricsDAO.getSessionMetrics(Mockito.anyString())).thenAnswer(invocation -> {
-            final int active = activeRequests.incrementAndGet();
-            maxActiveRequests.updateAndGet(current -> Math.max(current, active));
-            try {
-                Thread.sleep(25);
-                return new SessionMetrics(invocation.getArgument(0), Map.of("cpu", "100m"));
-            } finally {
-                activeRequests.decrementAndGet();
-            }
-        });
-
-        final ExecutorService executor = Executors.newFixedThreadPool(8);
-        try {
-            final MetricsBackendPodUsageProvider provider =
-                    new MetricsBackendPodUsageProvider(sessionMetricsDAO, 8, 30, executor);
-            final List<Job> jobs = new ArrayList<>();
-            for (int index = 0; index < 20; index++) {
-                jobs.add(job("job-" + index, "session-" + index));
-            }
-
-            provider.getPodMetrics("alice", false, jobs);
-        } finally {
-            executor.shutdownNow();
-        }
-
-        Assert.assertTrue("max concurrent requests was " + maxActiveRequests.get(), maxActiveRequests.get() <= 8);
-        Mockito.verify(sessionMetricsDAO, Mockito.times(20)).getSessionMetrics(Mockito.anyString());
-    }
-
-    @Test
-    public void getPodMetricsCancelsOutstandingRequestsAtAggregateDeadline() throws Exception {
-        final AtomicBoolean slowCompleted = new AtomicBoolean(false);
-        final SessionMetricsDAO sessionMetricsDAO = Mockito.mock(SessionMetricsDAO.class);
-        Mockito.when(sessionMetricsDAO.getSessionMetrics(Mockito.startsWith("session-slow")))
-                .thenAnswer(invocation -> {
-                    try {
-                        Thread.sleep(120_000);
-                        slowCompleted.set(true);
-                        return new SessionMetrics(invocation.getArgument(0), Map.of("cpu", "100m"));
-                    } catch (final InterruptedException ex) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException(ex);
-                    }
-                });
-        Mockito.when(sessionMetricsDAO.getSessionMetrics("session-fast"))
-                .thenReturn(new SessionMetrics("session-fast", Map.of("cpu", "250m")));
-
-        final ExecutorService executor = Executors.newFixedThreadPool(1);
-        try {
-            final MetricsBackendPodUsageProvider provider =
-                    new MetricsBackendPodUsageProvider(sessionMetricsDAO, 1, 1, executor);
-            final long startedAt = System.currentTimeMillis();
-            final PodMetrics podMetrics = provider.getPodMetrics(
-                    "alice",
-                    false,
-                    List.of(
-                            job("job-slow-1", "session-slow-1"),
-                            job("job-slow-2", "session-slow-2"),
-                            job("job-fast", "session-fast")));
-            final long elapsedMillis = System.currentTimeMillis() - startedAt;
-
-            Assert.assertTrue("fan-out should stop at aggregate deadline", elapsedMillis < 5_000L);
-            Assert.assertFalse("slow session fetch should be cancelled before completion", slowCompleted.get());
-            Mockito.verify(sessionMetricsDAO, Mockito.never()).getSessionMetrics("session-fast");
-            Assert.assertTrue(podMetrics.cpuByPodName().isEmpty());
-        } finally {
-            executor.shutdownNow();
-        }
+    private static SessionMetrics usage(final String sessionId, final String cpu, final String memory) {
+        return new SessionMetrics(
+                sessionId,
+                List.of(
+                        new SessionMetrics.Resource("cpu", null, "1", cpu, null),
+                        new SessionMetrics.Resource("memory", null, "1Gi", memory, null)));
     }
 
     private static Job job(final String jobName, final String sessionId) {

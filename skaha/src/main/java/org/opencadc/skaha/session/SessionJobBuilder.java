@@ -4,6 +4,7 @@ import ca.nrc.cadc.util.StringUtil;
 import io.fabric8.kubernetes.api.model.Affinity;
 import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.EnvVar;
+import io.fabric8.kubernetes.api.model.EnvVarBuilder;
 import io.fabric8.kubernetes.api.model.LocalObjectReference;
 import io.fabric8.kubernetes.api.model.NodeAffinity;
 import io.fabric8.kubernetes.api.model.NodeSelector;
@@ -60,6 +61,7 @@ public class SessionJobBuilder {
     private String image;
     private String priorityClassName;
     private HeadlessCommand headlessCommand;
+    private BatchSpec batch;
     private FlexibleSpread flexibleSpread;
 
     /**
@@ -261,6 +263,17 @@ public class SessionJobBuilder {
         return this;
     }
 
+    /**
+     * Run the Job as a batch: one Indexed Job whose indexes Kueue may admit only partly.
+     *
+     * @param batch The replicas and maxfail from the request, or null for a session that is not a batch.
+     * @return This SessionJobBuilder, never null.
+     */
+    SessionJobBuilder withBatch(final BatchSpec batch) {
+        this.batch = batch;
+        return this;
+    }
+
     LaunchArtifacts buildLaunch() throws IOException {
         String jobFileString = Files.readString(jobFilePath, StandardCharsets.UTF_8);
         // Request values are set as typed fields after parsing; the template text only ever gets fixed stand-ins,
@@ -287,6 +300,8 @@ public class SessionJobBuilder {
         applyImage(launchJob);
         applyPriorityClass(launchJob);
         applyHeadlessCommand(launchJob);
+        applyBatch(launchJob);
+        applySessionEnv(launchJob, labelPlan);
 
         return new LaunchArtifacts(launchJob, labelPlan, this.assignment);
     }
@@ -528,6 +543,65 @@ public class SessionJobBuilder {
         }
         // Request variables first: for a repeated name the template's value, listed later, wins.
         container.getEnv().addAll(0, this.headlessCommand.env());
+    }
+
+    /**
+     * Size the Indexed Job: one index per replica, all requested at once. Kueue lowers {@code parallelism} to the free
+     * slots, down to the minimum of one; the template fixes the rest of the indexed policy. Each app container learns
+     * its index and the replica count.
+     */
+    private void applyBatch(final Job launchJob) {
+        if (this.batch == null) {
+            return;
+        }
+        launchJob.getSpec().setCompletions(this.batch.replicas());
+        launchJob.getSpec().setParallelism(this.batch.replicas());
+        launchJob.getSpec().setMaxFailedIndexes(this.batch.maxFailedIndexes());
+        final Map<String, String> annotations =
+                new HashMap<>(Objects.requireNonNullElse(launchJob.getMetadata().getAnnotations(), Map.of()));
+        // Kueue requires the minimum to be below the requested parallelism.
+        if (this.batch.replicas() > 1) {
+            annotations.put(BatchSpec.MIN_PARALLELISM_ANNOTATION, "1");
+        }
+        // maxFailedIndexes is rounded, so the Batch document reads the request back from here.
+        if (this.batch.maxfail() != null) {
+            annotations.put(BatchSpec.MAXFAIL_ANNOTATION, this.batch.maxfail().toPlainString());
+        }
+        launchJob.getMetadata().setAnnotations(annotations);
+        appendEnv(
+                launchJob,
+                List.of(
+                        new EnvVarBuilder()
+                                .withName("CANFAR_REPLICA_INDEX")
+                                .withNewValueFrom()
+                                .withNewFieldRef()
+                                .withFieldPath("metadata.annotations['" + Batch.COMPLETION_INDEX + "']")
+                                .endFieldRef()
+                                .endValueFrom()
+                                .build(),
+                        new EnvVar("CANFAR_REPLICA_COUNT", Integer.toString(this.batch.replicas()), null)));
+    }
+
+    /**
+     * Append the platform's {@code CANFAR_SESSION_*} variables to every app container. A request cannot send a
+     * {@code CANFAR_*} name and no template sets one, so none repeats. The values come from the label plan, so they
+     * equal the labels.
+     */
+    private void applySessionEnv(final Job launchJob, final SessionLabelPlan labelPlan) {
+        final Map<String, String> labels = labelPlan.jobLabels();
+        appendEnv(
+                launchJob,
+                List.of(
+                        new EnvVar("CANFAR_SESSION_KIND", SessionLabels.require(labels, SessionLabels.Key.KIND), null),
+                        new EnvVar("CANFAR_SESSION_ID", SessionLabels.require(labels, SessionLabels.Key.ID), null),
+                        new EnvVar(
+                                "CANFAR_USERNAME", SessionLabels.require(labels, SessionLabels.Key.USERNAME), null)));
+    }
+
+    private static void appendEnv(final Job launchJob, final List<EnvVar> env) {
+        podSpec(launchJob)
+                .getContainers()
+                .forEach(container -> container.getEnv().addAll(env));
     }
 
     /**

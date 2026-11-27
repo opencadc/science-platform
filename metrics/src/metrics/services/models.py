@@ -153,7 +153,12 @@ class UserObservation:
 
 @dataclass(frozen=True, slots=True)
 class SessionObservation:
-    """Represent one session's Job reservations and timing inputs."""
+    """Represent one session's Job reservations and timing inputs.
+
+    ``requests`` is what the session's Jobs hold now. ``totals`` is the
+    whole-run demand of its batch Jobs; it is empty when the session has no
+    batch Job.
+    """
 
     session: str
     requests: dict[str, str]
@@ -165,11 +170,14 @@ class SessionObservation:
     pods_reachable: bool = True
     running_pods_by_namespace: dict[str, frozenset[str]] = field(default_factory=dict)
     job_names: tuple[str, ...] = ()
+    totals: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Validate the queue count, timestamps, and observation time."""
+        """Validate the queue count, resource names, timestamps, and observation time."""
         if self.reserving_workloads < 0:
             raise ValueError("reserving_workloads must be non-negative")
+        if not self.totals.keys() <= self.requests.keys():
+            raise ValueError("every total needs a held request for the same resource")
         object.__setattr__(self, "observed_at", as_utc(self.observed_at))
         object.__setattr__(self, "window_end", as_utc(self.window_end))
         if self.start_time is not None:
